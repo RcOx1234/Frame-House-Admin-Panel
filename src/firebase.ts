@@ -1,4 +1,5 @@
 import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
+import { getAuth, type Auth } from 'firebase/auth';
 import { getFirestore, type Firestore } from 'firebase/firestore';
 
 function firebaseConfig() {
@@ -14,24 +15,31 @@ function firebaseConfig() {
 
 let app: FirebaseApp | undefined;
 let db: Firestore | undefined;
+let auth: Auth | undefined;
 
-export function getDb(): Firestore {
+function getApp(): FirebaseApp {
   const cfg = firebaseConfig();
   if (!cfg.apiKey || !cfg.projectId) {
     throw new Error(
       'Falta configuración de Firebase. Crea .env.local con las variables VITE_FIREBASE_* indicadas en .env.example.'
     );
   }
-  if (!db) {
+  if (!app) {
     app = getApps().length ? getApps()[0] : initializeApp(cfg);
-    db = getFirestore(app);
+  }
+  return app;
+}
+
+export function getDb(): Firestore {
+  if (!db) {
+    db = getFirestore(getApp());
   }
   return db;
 }
 
-export function panelPasswords() {
-  return {
-    admin: import.meta.env.VITE_ADMIN_PASSWORD ?? '',
-    guest: import.meta.env.VITE_GUEST_PASSWORD ?? '',
-  };
+export function getAuthClient(): Auth {
+  if (!auth) {
+    auth = getAuth(getApp());
+  }
+  return auth;
 }

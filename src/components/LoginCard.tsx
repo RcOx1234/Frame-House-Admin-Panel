@@ -1,46 +1,33 @@
-import { useState, type FormEvent } from 'react';
-import type { PanelRole } from '../types/cotizacion';
-import { panelPasswords } from '../firebase';
+import { useMemo, useState, type FormEvent } from 'react';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { getAuthClient } from '../firebase';
 
 type Props = {
-  onSuccess: (role: PanelRole) => void;
+  onSuccess: () => void;
 };
 
-const ADMIN_USER = 'Frame House';
-const GUEST_USER = 'Invitado';
+const ADMIN_EMAIL = 'admin@framehouse.com';
+const GUEST_EMAIL = 'invitado@framehouse.com';
 
 export function LoginCard({ onSuccess }: Props) {
   const [isGuest, setIsGuest] = useState(false);
+  const email = useMemo(() => (isGuest ? GUEST_EMAIL : ADMIN_EMAIL), [isGuest]);
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
-    const { admin, guest } = panelPasswords();
-
-    if (isGuest) {
-      if (!guest) {
-        setError('Contraseña de invitado no configurada (VITE_GUEST_PASSWORD).');
-        return;
-      }
-      if (password !== guest) {
-        setError('Credenciales incorrectas.');
-        return;
-      }
-      onSuccess('guest');
-      return;
-    }
-
-    if (!admin) {
-      setError('Contraseña de administrador no configurada (VITE_ADMIN_PASSWORD).');
-      return;
-    }
-    if (password !== admin) {
+    setLoading(true);
+    try {
+      await signInWithEmailAndPassword(getAuthClient(), email, password);
+      onSuccess();
+    } catch {
       setError('Credenciales incorrectas.');
-      return;
+    } finally {
+      setLoading(false);
     }
-    onSuccess('admin');
   }
 
   return (
@@ -72,7 +59,7 @@ export function LoginCard({ onSuccess }: Props) {
             Usuario
           </label>
           <div className="mt-1 rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2.5 text-sm text-neutral-200">
-            {isGuest ? GUEST_USER : ADMIN_USER}
+            {email}
           </div>
         </div>
 
@@ -102,9 +89,10 @@ export function LoginCard({ onSuccess }: Props) {
 
         <button
           type="submit"
+          disabled={loading}
           className="w-full rounded-lg bg-amber-600 py-2.5 text-sm font-medium text-neutral-950 transition hover:bg-amber-500 active:bg-amber-700"
         >
-          Entrar
+          {loading ? 'Ingresando…' : 'Entrar'}
         </button>
       </form>
     </div>

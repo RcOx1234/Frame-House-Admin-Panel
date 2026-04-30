@@ -1,31 +1,50 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { onAuthStateChanged, signOut, type User } from 'firebase/auth';
 import { LoginCard } from './components/LoginCard';
 import { AdminPanel } from './pages/AdminPanel';
 import type { PanelRole } from './types/cotizacion';
-import { SESSION_KEY } from './constants/session';
+import { getAuthClient } from './firebase';
 
-function readStoredRole(): PanelRole | null {
-  const r = sessionStorage.getItem(SESSION_KEY);
-  return r === 'admin' || r === 'guest' ? r : null;
-}
+const ADMIN_EMAIL = 'admin@framehouse.com';
+const GUEST_EMAIL = 'invitado@framehouse.com';
 
 export default function App() {
-  const [role, setRole] = useState<PanelRole | null>(readStoredRole);
+  const [user, setUser] = useState<User | null>(null);
+  const [checking, setChecking] = useState(true);
 
-  function handleLogin(next: PanelRole) {
-    sessionStorage.setItem(SESSION_KEY, next);
-    setRole(next);
+  useEffect(() => {
+    const unsub = onAuthStateChanged(getAuthClient(), (u) => {
+      setUser(u);
+      setChecking(false);
+    });
+    return () => unsub();
+  }, []);
+
+  const role: PanelRole | null = useMemo(() => {
+    if (!user?.email) return null;
+    if (user.email === ADMIN_EMAIL) return 'admin';
+    if (user.email === GUEST_EMAIL) return 'guest';
+    return 'guest';
+  }, [user?.email]);
+
+  async function handleLogout() {
+    await signOut(getAuthClient());
   }
 
-  function handleLogout() {
-    sessionStorage.removeItem(SESSION_KEY);
-    setRole(null);
-  }
-
-  if (!role) {
+  if (checking) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-neutral-950 px-4 py-12">
-        <LoginCard onSuccess={handleLogin} />
+        <div className="rounded-xl border border-neutral-800 bg-neutral-900/50 px-5 py-4 text-sm text-neutral-400">
+          Verificando sesión…
+        </div>
+      </div>
+    );
+  }
+
+  if (!user || !role) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-neutral-950 px-4 py-12">
+        <LoginCard onSuccess={() => {}} />
       </div>
     );
   }

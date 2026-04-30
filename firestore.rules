@@ -1,0 +1,21 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /cotizaciones/{docId} {
+      // Solo usuarios autenticados pueden leer
+      allow read: if request.auth != null;
+
+      // SOLO admin puede eliminar
+      allow delete: if request.auth != null
+        && request.auth.token.email == "admin@framehouse.com";
+
+      // Permitir escritura desde el formulario (ajustable luego)
+      allow create: if true;
+
+      // El panel no edita cotizaciones
+      allow update: if false;
+    }
+  }
+}
+
