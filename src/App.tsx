@@ -7,6 +7,8 @@ import { getAuthClient } from './firebase';
 
 const ADMIN_EMAIL = 'admin@framehouse.com';
 const GUEST_EMAIL = 'invitado@framehouse.com';
+const SESSION_TTL_MS = 10 * 60 * 1000; // 10 minutos
+const LS_LOGIN_AT_KEY = 'fh_login_at';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -20,6 +22,28 @@ export default function App() {
     return () => unsub();
   }, []);
 
+  useEffect(() => {
+    if (!user) return;
+
+    function isExpired(): boolean {
+      const loginAt = Number(localStorage.getItem(LS_LOGIN_AT_KEY) || 0);
+      if (!loginAt) return false;
+      return Date.now() - loginAt > SESSION_TTL_MS;
+    }
+
+    const tick = async () => {
+      if (!user) return;
+      if (isExpired()) {
+        localStorage.removeItem(LS_LOGIN_AT_KEY);
+        await signOut(getAuthClient());
+      }
+    };
+
+    void tick();
+    const id = window.setInterval(() => void tick(), 15_000);
+    return () => window.clearInterval(id);
+  }, [user]);
+
   const role: PanelRole | null = useMemo(() => {
     if (!user?.email) return null;
     if (user.email === ADMIN_EMAIL) return 'admin';
@@ -28,6 +52,7 @@ export default function App() {
   }, [user?.email]);
 
   async function handleLogout() {
+    localStorage.removeItem(LS_LOGIN_AT_KEY);
     await signOut(getAuthClient());
   }
 

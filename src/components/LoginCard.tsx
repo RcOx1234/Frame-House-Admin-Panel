@@ -32,6 +32,12 @@ export function LoginCard({ onSuccess }: Props) {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+
+    if (!password.trim()) {
+      setError('Necesitas ingresar una contraseña.');
+      return;
+    }
+
     setLoading(true);
     try {
       const blockUntil = getBlockUntil();
@@ -42,6 +48,7 @@ export function LoginCard({ onSuccess }: Props) {
       }
 
       await signInWithEmailAndPassword(getAuthClient(), email, password);
+      localStorage.setItem('fh_login_at', String(Date.now()));
       localStorage.removeItem(LS_ATTEMPTS_KEY);
       localStorage.removeItem(LS_BLOCK_UNTIL_KEY);
       onSuccess();
