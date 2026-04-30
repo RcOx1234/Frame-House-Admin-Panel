@@ -6,6 +6,11 @@ type Props = {
   onSuccess: () => void;
 };
 
+const MAX_ATTEMPTS = 5;
+const BLOCK_TIME = 5 * 60 * 1000; // 5 minutos
+const LS_ATTEMPTS_KEY = 'loginAttempts';
+const LS_BLOCK_UNTIL_KEY = 'blockUntil';
+
 const ADMIN_EMAIL = 'admin@framehouse.com';
 const GUEST_EMAIL = 'invitado@framehouse.com';
 
@@ -16,15 +21,42 @@ export function LoginCard({ onSuccess }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  function getAttempts(): number {
+    return Number(localStorage.getItem(LS_ATTEMPTS_KEY) || 0);
+  }
+
+  function getBlockUntil(): number {
+    return Number(localStorage.getItem(LS_BLOCK_UNTIL_KEY) || 0);
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     setLoading(true);
     try {
+      const blockUntil = getBlockUntil();
+      if (Date.now() < blockUntil) {
+        setError('Demasiados intentos. Reintenta nuevamente luego.');
+        return;
+      }
+
       await signInWithEmailAndPassword(getAuthClient(), email, password);
+      localStorage.removeItem(LS_ATTEMPTS_KEY);
+      localStorage.removeItem(LS_BLOCK_UNTIL_KEY);
       onSuccess();
     } catch {
-      setError('Credenciales incorrectas.');
+      const attempts = getAttempts();
+      const newAttempts = attempts + 1;
+      localStorage.setItem(LS_ATTEMPTS_KEY, String(newAttempts));
+
+      if (newAttempts >= MAX_ATTEMPTS) {
+        const blockUntil = Date.now() + BLOCK_TIME;
+        localStorage.setItem(LS_BLOCK_UNTIL_KEY, String(blockUntil));
+        localStorage.setItem(LS_ATTEMPTS_KEY, '0');
+        setError('Demasiados intentos fallidos. Has sido bloqueado por 5 minutos.');
+      } else {
+        setError(`Credenciales incorrectas. Intento ${newAttempts} de ${MAX_ATTEMPTS}.`);
+      }
     } finally {
       setLoading(false);
     }
