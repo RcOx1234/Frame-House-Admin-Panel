@@ -36,7 +36,8 @@ export function LoginCard({ onSuccess }: Props) {
     try {
       const blockUntil = getBlockUntil();
       if (Date.now() < blockUntil) {
-        setError('Demasiados intentos. Reintenta nuevamente luego.');
+        const remainingMinutes = Math.ceil((blockUntil - Date.now()) / 60000);
+        setError(`Demasiados intentos. Reintenta nuevamente en ${remainingMinutes} minuto(s).`);
         return;
       }
 
