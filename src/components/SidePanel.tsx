@@ -5,12 +5,16 @@ import type { SessionDoc } from '../services/sessions';
 type Props = {
   open: boolean;
   role: PanelRole;
-  viewMode: 'list' | 'grid';
+  viewMode: 'list' | 'grid' | 'cards';
   focused: boolean;
+  section: 'registros' | 'galeria';
   onClose: () => void;
   onToggleView: () => void;
   onToggleFocused: () => void;
   onRefresh: () => void;
+  onOpenGallery: () => void;
+  onOpenRegistros: () => void;
+  onCreateGalleryProject: () => void;
   sessions: SessionDoc[];
   sessionsLoading: boolean;
   sessionsError: string | null;
@@ -27,10 +31,14 @@ export function SidePanel({
   role,
   viewMode,
   focused,
+  section,
   onClose,
   onToggleView,
   onToggleFocused,
   onRefresh,
+  onOpenGallery,
+  onOpenRegistros,
+  onCreateGalleryProject,
   sessions,
   sessionsLoading,
   sessionsError,
@@ -79,6 +87,35 @@ export function SidePanel({
 
         <div className="space-y-6 px-6 py-5">
           <section className="space-y-3 rounded-2xl border border-neutral-800 bg-neutral-900/30 p-4">
+            <SectionTitle>Secciones</SectionTitle>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={onOpenRegistros}
+                className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-200"
+              >
+                Registros {section === 'registros' ? '•' : ''}
+              </button>
+              <button
+                type="button"
+                onClick={onOpenGallery}
+                className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-200"
+              >
+                Galería {section === 'galeria' ? '•' : ''}
+              </button>
+              {role === 'admin' ? (
+                <button
+                  type="button"
+                  onClick={onCreateGalleryProject}
+                  className="rounded-lg border border-amber-500/30 bg-amber-950/30 px-3 py-2 text-sm text-amber-200"
+                >
+                  Crear nuevo
+                </button>
+              ) : null}
+            </div>
+          </section>
+
+          <section className="space-y-3 rounded-2xl border border-neutral-800 bg-neutral-900/30 p-4">
             <SectionTitle>Vista</SectionTitle>
             <div className="flex flex-wrap gap-2">
               <button
@@ -86,15 +123,17 @@ export function SidePanel({
                 onClick={onToggleView}
                 className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm font-medium text-neutral-200 transition hover:bg-neutral-800"
               >
-                Cambiar a {viewMode === 'list' ? 'cuadrícula' : 'lista'}
+                Cambiar a {section === 'registros' ? (viewMode === 'list' ? 'cuadrícula' : 'lista') : (viewMode === 'cards' ? 'lista' : 'cards')}
               </button>
-              <button
-                type="button"
-                onClick={onToggleFocused}
-                className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm font-medium text-neutral-200 transition hover:bg-neutral-800"
-              >
-                {focused ? 'Salir de modo registros' : 'Modo solo registros'}
-              </button>
+              {section === 'registros' ? (
+                <button
+                  type="button"
+                  onClick={onToggleFocused}
+                  className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm font-medium text-neutral-200 transition hover:bg-neutral-800"
+                >
+                  {focused ? 'Salir de modo registros' : 'Modo solo registros'}
+                </button>
+              ) : null}
               <button
                 type="button"
                 onClick={onRefresh}

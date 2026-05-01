@@ -11,6 +11,7 @@ import { DetailsModal } from '../components/DetailsModal';
 import { CotizacionesGrid } from '../components/CotizacionesGrid';
 import { SidePanel } from '../components/SidePanel';
 import { SessionExpiryBanner } from '../components/SessionExpiryBanner';
+import { GallerySection } from '../components/GallerySection';
 type Props = {
   role: PanelRole;
   onLogout: () => void;
@@ -170,8 +171,18 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContex
     const saved = localStorage.getItem('fh_view_mode');
     return saved === 'grid' ? 'grid' : 'list';
   });
+  const [galleryViewMode, setGalleryViewMode] = useState<'cards' | 'list'>(() => {
+    const saved = localStorage.getItem('fh_gallery_view_mode');
+    return saved === 'list' ? 'list' : 'cards';
+  });
   const [focused, setFocused] = useState<boolean>(() => localStorage.getItem('fh_focused') === '1');
   const [sideOpen, setSideOpen] = useState(false);
+  const [section, setSection] = useState<'registros' | 'galeria'>(() => {
+    const saved = localStorage.getItem('fh_admin_section');
+    return saved === 'galeria' ? 'galeria' : 'registros';
+  });
+  const [galleryCreateSignal, setGalleryCreateSignal] = useState(0);
+  const [galleryReloadSignal, setGalleryReloadSignal] = useState(0);
   const [sessions, setSessions] = useState<import('../services/sessions').SessionDoc[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
   const [sessionsError, setSessionsError] = useState<string | null>(null);
@@ -253,9 +264,17 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContex
   }
 
   function toggleView() {
-    setViewMode((v) => {
-      const next = v === 'list' ? 'grid' : 'list';
-      localStorage.setItem('fh_view_mode', next);
+    if (section === 'registros') {
+      setViewMode((v) => {
+        const next = v === 'list' ? 'grid' : 'list';
+        localStorage.setItem('fh_view_mode', next);
+        return next;
+      });
+      return;
+    }
+    setGalleryViewMode((v) => {
+      const next = v === 'cards' ? 'list' : 'cards';
+      localStorage.setItem('fh_gallery_view_mode', next);
       return next;
     });
   }
@@ -266,6 +285,11 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContex
       localStorage.setItem('fh_focused', next ? '1' : '0');
       return next;
     });
+  }
+
+  function openSection(next: 'registros' | 'galeria') {
+    setSection(next);
+    localStorage.setItem('fh_admin_section', next);
   }
 
   const loadSessions = useCallback(async () => {
@@ -282,6 +306,14 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContex
       setSessionsLoading(false);
     }
   }, [role]);
+
+  function reloadCurrentSection() {
+    if (section === 'registros') {
+      void load();
+      return;
+    }
+    setGalleryReloadSignal((n) => n + 1);
+  }
 
   useEffect(() => {
     if (role !== 'admin') return;
@@ -313,35 +345,61 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContex
             </IconButton>
             <IconButton
               onClick={toggleView}
-              title={viewMode === 'list' ? 'Cambiar a cuadrícula' : 'Cambiar a lista'}
-              ariaLabel={viewMode === 'list' ? 'Cambiar a cuadrícula' : 'Cambiar a lista'}
+              title={
+                section === 'registros'
+                  ? viewMode === 'list'
+                    ? 'Cambiar a cuadrícula'
+                    : 'Cambiar a lista'
+                  : galleryViewMode === 'cards'
+                    ? 'Cambiar a lista'
+                    : 'Cambiar a cards'
+              }
+              ariaLabel={
+                section === 'registros'
+                  ? viewMode === 'list'
+                    ? 'Cambiar a cuadrícula'
+                    : 'Cambiar a lista'
+                  : galleryViewMode === 'cards'
+                    ? 'Cambiar a lista'
+                    : 'Cambiar a cards'
+              }
             >
-              {viewMode === 'list' ? <IconGrid /> : <IconList />}
+              {section === 'registros'
+                ? viewMode === 'list'
+                  ? <IconGrid />
+                  : <IconList />
+                : galleryViewMode === 'cards'
+                  ? <IconList />
+                  : <IconGrid />}
             </IconButton>
-            <button
-              type="button"
-              onClick={toggleFocused}
-              className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm font-medium text-neutral-200 transition hover:bg-neutral-800"
-              title={focused ? 'Salir de modo registros' : 'Modo registros'}
-            >
-              {focused ? 'Vista normal' : 'Modo registros'}
-            </button>
+            {section === 'registros' ? (
+              <button
+                type="button"
+                onClick={toggleFocused}
+                className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm font-medium text-neutral-200 transition hover:bg-neutral-800"
+                title={focused ? 'Salir de modo registros' : 'Modo registros'}
+              >
+                {focused ? 'Vista normal' : 'Modo registros'}
+              </button>
+            ) : null}
             <IconButton
-              onClick={() => void load()}
-              disabled={loading}
-              title={loading ? 'Actualizando…' : 'Actualizar lista'}
-              ariaLabel="Actualizar lista"
+              onClick={reloadCurrentSection}
+              disabled={section === 'registros' ? loading : false}
+              title={section === 'registros' && loading ? 'Actualizando…' : 'Actualizar'}
+              ariaLabel="Actualizar sección"
             >
               <IconRefresh />
             </IconButton>
-            <IconButton
-              onClick={handleExport}
-              disabled={!filtered.length}
-              title="Exportar"
-              ariaLabel="Exportar registros"
-            >
-              <IconDownload />
-            </IconButton>
+            {section === 'registros' ? (
+              <IconButton
+                onClick={handleExport}
+                disabled={!filtered.length}
+                title="Exportar"
+                ariaLabel="Exportar registros"
+              >
+                <IconDownload />
+              </IconButton>
+            ) : null}
             <button
               type="button"
               onClick={() => onLogout()}
@@ -354,106 +412,111 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContex
       </header>
 
       <main className="mx-auto max-w-6xl space-y-6 px-4 pt-6">
-        {sessionExpiryWarning ? (
-          <SessionExpiryBanner message={sessionExpiryWarning.message} onDismiss={sessionExpiryWarning.onDismiss} />
-        ) : null}
-
-        {!focused ? (
-          <div className="grid gap-3 sm:grid-cols-3">
-            <StatsCard title="Registros visibles" value={filtered.length} hint="Tras búsqueda y filtro" />
-            <StatsCard title="Planes distintos" value={uniquePlans} hint="En el resultado actual" />
-            <StatsCard
-              title="Acceso"
-              value={role === 'admin' ? 'Admin' : 'Lectura'}
-            hint={role === 'admin' ? 'Control total' : 'Solo lectura'}
-            />
-          </div>
-        ) : null}
-
-        <div className="rounded-xl border border-neutral-800 bg-neutral-900/50 p-4">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
-            <div className="flex-1">
-              <label htmlFor="search" className="text-xs font-medium uppercase text-neutral-500">
-                Búsqueda
-              </label>
-              <input
-                id="search"
-                type="search"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Empresa, nombre, email o plan…"
-                className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2.5 text-sm text-neutral-100 outline-none ring-amber-500/0 focus:border-neutral-600 focus:ring-2 focus:ring-amber-500/25"
-              />
-            </div>
-            {!focused ? (
-              <>
-                <div className="w-full lg:w-48">
-                  <label htmlFor="plan" className="text-xs font-medium uppercase text-neutral-500">
-                    Plan
-                  </label>
-                  <select
-                    id="plan"
-                    value={planFilter}
-                    onChange={(e) => setPlanFilter(e.target.value as PlanFilterValue)}
-                    className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2.5 text-sm text-neutral-100 outline-none focus:border-neutral-600 focus:ring-2 focus:ring-amber-500/25"
-                  >
-                    {PLAN_OPTIONS.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="w-full lg:w-44">
-                  <label htmlFor="sort" className="text-xs font-medium uppercase text-neutral-500">
-                    Orden
-                  </label>
-                  <select
-                    id="sort"
-                    value={sortOrder}
-                    onChange={(e) => setSortOrder(e.target.value as SortOrder)}
-                    className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2.5 text-sm text-neutral-100 outline-none focus:border-neutral-600 focus:ring-2 focus:ring-amber-500/25"
-                  >
-                    <option value="desc">Fecha · más recientes</option>
-                    <option value="asc">Fecha · más antiguos</option>
-                  </select>
-                </div>
-              </>
+        {section === 'registros' ? (
+          <>
+            {sessionExpiryWarning ? (
+              <SessionExpiryBanner message={sessionExpiryWarning.message} onDismiss={sessionExpiryWarning.onDismiss} />
             ) : null}
-          </div>
-          {copyFeedback ? (
-            <p className="mt-3 text-sm text-amber-400/90">{copyFeedback}</p>
-          ) : null}
-        </div>
 
-        {error ? (
-          <div className="rounded-lg border border-red-900/50 bg-red-950/30 px-4 py-3 text-sm text-red-200">
-            {error}
-          </div>
-        ) : null}
+            {!focused ? (
+              <div className="grid gap-3 sm:grid-cols-3">
+                <StatsCard title="Registros visibles" value={filtered.length} hint="Tras búsqueda y filtro" />
+                <StatsCard title="Planes distintos" value={uniquePlans} hint="En el resultado actual" />
+                <StatsCard title="Acceso" value={role === 'admin' ? 'Admin' : 'Lectura'} hint={role === 'admin' ? 'Control total' : 'Solo lectura'} />
+              </div>
+            ) : null}
 
-        {viewMode === 'list' ? (
-          <CotizacionesTable
-            rows={filtered}
-            role={role}
-            busyId={busyId}
-            onCopyEmail={handleCopyEmail}
-            onDetails={(row) => setDetailsRow(row)}
-            onDelete={handleDelete}
-          />
+            <div className="rounded-xl border border-neutral-800 bg-neutral-900/50 p-4">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
+                <div className="flex-1">
+                  <label htmlFor="search" className="text-xs font-medium uppercase text-neutral-500">
+                    Búsqueda
+                  </label>
+                  <input
+                    id="search"
+                    type="search"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Empresa, nombre, email o plan…"
+                    className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2.5 text-sm text-neutral-100 outline-none ring-amber-500/0 focus:border-neutral-600 focus:ring-2 focus:ring-amber-500/25"
+                  />
+                </div>
+                {!focused ? (
+                  <>
+                    <div className="w-full lg:w-48">
+                      <label htmlFor="plan" className="text-xs font-medium uppercase text-neutral-500">
+                        Plan
+                      </label>
+                      <select
+                        id="plan"
+                        value={planFilter}
+                        onChange={(e) => setPlanFilter(e.target.value as PlanFilterValue)}
+                        className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2.5 text-sm text-neutral-100 outline-none focus:border-neutral-600 focus:ring-2 focus:ring-amber-500/25"
+                      >
+                        {PLAN_OPTIONS.map((o) => (
+                          <option key={o.value} value={o.value}>
+                            {o.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="w-full lg:w-44">
+                      <label htmlFor="sort" className="text-xs font-medium uppercase text-neutral-500">
+                        Orden
+                      </label>
+                      <select
+                        id="sort"
+                        value={sortOrder}
+                        onChange={(e) => setSortOrder(e.target.value as SortOrder)}
+                        className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2.5 text-sm text-neutral-100 outline-none focus:border-neutral-600 focus:ring-2 focus:ring-amber-500/25"
+                      >
+                        <option value="desc">Fecha · más recientes</option>
+                        <option value="asc">Fecha · más antiguos</option>
+                      </select>
+                    </div>
+                  </>
+                ) : null}
+              </div>
+              {copyFeedback ? <p className="mt-3 text-sm text-amber-400/90">{copyFeedback}</p> : null}
+            </div>
+
+            {error ? (
+              <div className="rounded-lg border border-red-900/50 bg-red-950/30 px-4 py-3 text-sm text-red-200">
+                {error}
+              </div>
+            ) : null}
+
+            {viewMode === 'list' ? (
+              <CotizacionesTable
+                rows={filtered}
+                role={role}
+                busyId={busyId}
+                onCopyEmail={handleCopyEmail}
+                onDetails={(row) => setDetailsRow(row)}
+                onDelete={handleDelete}
+              />
+            ) : (
+              <CotizacionesGrid
+                rows={filtered}
+                role={role}
+                busyId={busyId}
+                onDetails={(row) => setDetailsRow(row)}
+                onDelete={handleDelete}
+              />
+            )}
+
+            <p className="text-center text-xs text-neutral-600">
+              ID de documento disponible en la exportación CSV · Actualización manual de lista
+            </p>
+          </>
         ) : (
-          <CotizacionesGrid
-            rows={filtered}
+          <GallerySection
             role={role}
-            busyId={busyId}
-            onDetails={(row) => setDetailsRow(row)}
-            onDelete={handleDelete}
+            createSignal={galleryCreateSignal}
+            reloadSignal={galleryReloadSignal}
+            viewMode={galleryViewMode}
           />
         )}
-
-        <p className="text-center text-xs text-neutral-600">
-          ID de documento disponible en la exportación CSV · Actualización manual de lista
-        </p>
       </main>
       <DetailsModal
         open={Boolean(detailsRow)}
@@ -469,12 +532,26 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContex
       <SidePanel
         open={sideOpen}
         role={role}
-        viewMode={viewMode}
+        viewMode={section === 'registros' ? viewMode : galleryViewMode}
         focused={focused}
+        section={section}
         onClose={() => setSideOpen(false)}
         onToggleFocused={toggleFocused}
         onToggleView={toggleView}
-        onRefresh={() => void load()}
+        onRefresh={reloadCurrentSection}
+        onOpenGallery={() => {
+          openSection('galeria');
+          setSideOpen(false);
+        }}
+        onOpenRegistros={() => {
+          openSection('registros');
+          setSideOpen(false);
+        }}
+        onCreateGalleryProject={() => {
+          openSection('galeria');
+          setGalleryCreateSignal((n) => n + 1);
+          setSideOpen(false);
+        }}
         sessions={sessions}
         sessionsLoading={sessionsLoading}
         sessionsError={sessionsError}
