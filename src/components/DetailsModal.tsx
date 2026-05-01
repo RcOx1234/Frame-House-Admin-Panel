@@ -1,11 +1,15 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import type { CotizacionDoc } from '../types/cotizacion';
 import { dateFromFirestore, formatUsd } from '../utils/formatters';
+import type { PanelRole } from '../types/cotizacion';
 
 type Props = {
   open: boolean;
   row: CotizacionDoc | null;
+  role: PanelRole;
   onClose: () => void;
+  onDelete: (row: CotizacionDoc) => void;
+  busyId?: string | null;
 };
 
 function formatDateEs(value: CotizacionDoc['creadoEn']): string {
@@ -14,7 +18,9 @@ function formatDateEs(value: CotizacionDoc['creadoEn']): string {
   return d.toLocaleString('es-ES');
 }
 
-export function DetailsModal({ open, row, onClose }: Props) {
+export function DetailsModal({ open, row, role, onClose, onDelete, busyId }: Props) {
+  const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
+
   useEffect(() => {
     if (!open) return;
     function onKeyDown(e: KeyboardEvent) {
@@ -26,7 +32,35 @@ export function DetailsModal({ open, row, onClose }: Props) {
 
   if (!open || !row) return null;
 
-  const adicionales = row.productosAdicionales ?? [];
+  const safeRow = row;
+  const adicionales = safeRow.productosAdicionales ?? [];
+
+  async function handleCopyAll() {
+    try {
+      const adicionalesText = adicionales.length
+        ? adicionales.map((p) => `- ${p.nombre} (${formatUsd(p.precioUsd)})`).join('\n')
+        : 'Ninguno';
+      const text = [
+        `Empresa: ${safeRow.cliente.empresa || '—'}`,
+        `Nombre: ${safeRow.cliente.nombre || '—'}`,
+        `Email: ${safeRow.cliente.email || '—'}`,
+        `Plan: ${safeRow.plan.nombre || safeRow.plan.valor || '—'}`,
+        `Precio del plan: ${formatUsd(safeRow.plan.precioUsd)}`,
+        `Productos adicionales:\n${adicionalesText}`,
+        `Subtotal del plan: ${formatUsd(safeRow.totales.subtotalPlanUsd)}`,
+        `Subtotal de adicionales: ${formatUsd(safeRow.totales.subtotalAdicionalesUsd)}`,
+        `Total estimado: ${formatUsd(safeRow.totales.totalEstimadoUsd)}`,
+        `Fecha: ${formatDateEs(safeRow.creadoEn)}`,
+        `ID: ${safeRow.id}`,
+      ].join('\n');
+      await navigator.clipboard.writeText(text);
+      setCopyFeedback('Registro copiado');
+      window.setTimeout(() => setCopyFeedback(null), 2000);
+    } catch {
+      setCopyFeedback('No se pudo copiar');
+      window.setTimeout(() => setCopyFeedback(null), 2500);
+    }
+  }
 
   return (
     <div
@@ -45,16 +79,36 @@ export function DetailsModal({ open, row, onClose }: Props) {
               ID: {row.id}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg border border-neutral-700 px-3 py-1.5 text-sm font-medium text-neutral-300 transition hover:border-neutral-600 hover:text-neutral-100"
-          >
-            Cerrar
-          </button>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => void handleCopyAll()}
+              className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-1.5 text-sm font-medium text-neutral-200 transition hover:border-neutral-600 hover:bg-neutral-800"
+            >
+              Copiar datos
+            </button>
+            {role === 'admin' ? (
+              <button
+                type="button"
+                onClick={() => onDelete(safeRow)}
+                disabled={busyId === safeRow.id}
+                className="rounded-lg border border-red-900/60 bg-red-950/40 px-3 py-1.5 text-sm font-medium text-red-300 transition hover:bg-red-950/70 disabled:opacity-50"
+              >
+                {busyId === safeRow.id ? '…' : 'Eliminar'}
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-lg border border-neutral-700 px-3 py-1.5 text-sm font-medium text-neutral-300 transition hover:border-neutral-600 hover:text-neutral-100"
+            >
+              Cerrar
+            </button>
+          </div>
         </div>
 
         <div className="max-h-[75vh] overflow-y-auto px-6 py-5">
+          {copyFeedback ? <p className="mb-4 text-sm text-amber-400/90">{copyFeedback}</p> : null}
           <div className="grid gap-4 sm:grid-cols-2">
             <section className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-4">
               <h3 className="text-xs font-medium uppercase tracking-wide text-neutral-500">Cliente</h3>

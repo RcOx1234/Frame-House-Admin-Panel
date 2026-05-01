@@ -15,8 +15,8 @@ const ADMIN_EMAIL = 'admin@framehouse.com';
 const GUEST_EMAIL = 'invitado@framehouse.com';
 
 export function LoginCard({ onSuccess }: Props) {
-  const [isGuest, setIsGuest] = useState(false);
-  const email = useMemo(() => (isGuest ? GUEST_EMAIL : ADMIN_EMAIL), [isGuest]);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const email = useMemo(() => (isAdmin ? ADMIN_EMAIL : GUEST_EMAIL), [isAdmin]);
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -84,15 +84,15 @@ export function LoginCard({ onSuccess }: Props) {
         <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-neutral-800 bg-neutral-950/50 px-4 py-3 transition hover:border-neutral-700">
           <input
             type="checkbox"
-            checked={isGuest}
+            checked={isAdmin}
             onChange={(e) => {
-              setIsGuest(e.target.checked);
+              setIsAdmin(e.target.checked);
               setPassword('');
               setError(null);
             }}
             className="h-4 w-4 rounded border-neutral-600 bg-neutral-900 text-amber-500 focus:ring-amber-500/40"
           />
-          <span className="text-sm text-neutral-300">Soy invitado</span>
+          <span className="text-sm text-neutral-300">Soy Administrador</span>
         </label>
 
         <div>

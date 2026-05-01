@@ -4,13 +4,17 @@ import { deleteCotizacion, fetchCotizaciones } from '../services/cotizaciones';
 import { matchesSearch } from '../utils/search';
 import { matchesPlanFilter } from '../utils/planFilter';
 import { dateFromFirestore } from '../utils/formatters';
-import { downloadCsv, exportCotizacionesToCsv } from '../utils/exportCsv';
+// exportExcel se carga bajo demanda para no inflar el bundle inicial
 import { StatsCard } from '../components/StatsCard';
 import { CotizacionesTable } from '../components/CotizacionesTable';
 import { DetailsModal } from '../components/DetailsModal';
+import { CotizacionesGrid } from '../components/CotizacionesGrid';
+import { SidePanel } from '../components/SidePanel';
+import { SessionExpiryBanner } from '../components/SessionExpiryBanner';
 type Props = {
   role: PanelRole;
   onLogout: () => void;
+  sessionExpiryWarning?: { message: string; onDismiss: () => void } | null;
 };
 
 const PLAN_OPTIONS: { value: PlanFilterValue; label: string }[] = [
@@ -20,7 +24,138 @@ const PLAN_OPTIONS: { value: PlanFilterValue; label: string }[] = [
   { value: 'dominio', label: 'Dominio' },
 ];
 
-export function AdminPanel({ role, onLogout }: Props) {
+function IconButton({
+  title,
+  ariaLabel,
+  onClick,
+  disabled,
+  children,
+}: {
+  title: string;
+  ariaLabel: string;
+  onClick: () => void;
+  disabled?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-neutral-700 bg-neutral-900 text-neutral-200 transition hover:bg-neutral-800 disabled:opacity-50"
+      aria-label={ariaLabel}
+      title={title}
+    >
+      {children}
+    </button>
+  );
+}
+
+function IconPanelLeft() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-4 w-4"
+      aria-hidden="true"
+    >
+      <path d="M3 4h18" />
+      <path d="M3 12h18" />
+      <path d="M3 20h18" />
+      <path d="M8 4v16" />
+    </svg>
+  );
+}
+
+function IconGrid() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-4 w-4"
+      aria-hidden="true"
+    >
+      <rect x="3" y="3" width="7" height="7" rx="1" />
+      <rect x="14" y="3" width="7" height="7" rx="1" />
+      <rect x="3" y="14" width="7" height="7" rx="1" />
+      <rect x="14" y="14" width="7" height="7" rx="1" />
+    </svg>
+  );
+}
+
+function IconList() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-4 w-4"
+      aria-hidden="true"
+    >
+      <path d="M8 6h13" />
+      <path d="M8 12h13" />
+      <path d="M8 18h13" />
+      <path d="M3 6h.01" />
+      <path d="M3 12h.01" />
+      <path d="M3 18h.01" />
+    </svg>
+  );
+}
+
+function IconRefresh() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-4 w-4"
+      aria-hidden="true"
+    >
+      <path d="M21 12a9 9 0 1 1-3-6.7" />
+      <path d="M21 3v6h-6" />
+    </svg>
+  );
+}
+
+function IconDownload() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-4 w-4"
+      aria-hidden="true"
+    >
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <path d="M7 10l5 5 5-5" />
+      <path d="M12 15V3" />
+    </svg>
+  );
+}
+
+export function AdminPanel({ role, onLogout, sessionExpiryWarning }: Props) {
   const [rows, setRows] = useState<CotizacionDoc[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -30,6 +165,12 @@ export function AdminPanel({ role, onLogout }: Props) {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
   const [detailsRow, setDetailsRow] = useState<CotizacionDoc | null>(null);
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>(() => {
+    const saved = localStorage.getItem('fh_view_mode');
+    return saved === 'grid' ? 'grid' : 'list';
+  });
+  const [focused, setFocused] = useState<boolean>(() => localStorage.getItem('fh_focused') === '1');
+  const [sideOpen, setSideOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -100,9 +241,27 @@ export function AdminPanel({ role, onLogout }: Props) {
   }
 
   function handleExport() {
-    const csv = exportCotizacionesToCsv(filtered);
     const stamp = new Date().toISOString().slice(0, 10);
-    downloadCsv(`cotizaciones_frame_house_${stamp}.csv`, csv);
+    void (async () => {
+      const { exportCotizacionesToXlsx } = await import('../utils/exportExcel');
+      await exportCotizacionesToXlsx(`cotizaciones_frame_house_${stamp}.xlsx`, filtered);
+    })();
+  }
+
+  function toggleView() {
+    setViewMode((v) => {
+      const next = v === 'list' ? 'grid' : 'list';
+      localStorage.setItem('fh_view_mode', next);
+      return next;
+    });
+  }
+
+  function toggleFocused() {
+    setFocused((v) => {
+      const next = !v;
+      localStorage.setItem('fh_focused', next ? '1' : '0');
+      return next;
+    });
   }
 
   return (
@@ -121,22 +280,44 @@ export function AdminPanel({ role, onLogout }: Props) {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <IconButton
+              onClick={() => setSideOpen(true)}
+              title="Panel lateral"
+              ariaLabel="Abrir panel lateral"
+            >
+              <IconPanelLeft />
+            </IconButton>
+            <IconButton
+              onClick={toggleView}
+              title={viewMode === 'list' ? 'Cambiar a cuadrícula' : 'Cambiar a lista'}
+              ariaLabel={viewMode === 'list' ? 'Cambiar a cuadrícula' : 'Cambiar a lista'}
+            >
+              {viewMode === 'list' ? <IconGrid /> : <IconList />}
+            </IconButton>
             <button
               type="button"
+              onClick={toggleFocused}
+              className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm font-medium text-neutral-200 transition hover:bg-neutral-800"
+              title={focused ? 'Salir de modo registros' : 'Modo registros'}
+            >
+              {focused ? 'Vista normal' : 'Modo registros'}
+            </button>
+            <IconButton
               onClick={() => void load()}
               disabled={loading}
-              className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm font-medium text-neutral-200 transition hover:bg-neutral-800 disabled:opacity-50"
+              title={loading ? 'Actualizando…' : 'Actualizar lista'}
+              ariaLabel="Actualizar lista"
             >
-              {loading ? 'Actualizando…' : 'Actualizar lista'}
-            </button>
-            <button
-              type="button"
+              <IconRefresh />
+            </IconButton>
+            <IconButton
               onClick={handleExport}
               disabled={!filtered.length}
-              className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm font-medium text-neutral-200 transition hover:bg-neutral-800 disabled:opacity-40"
+              title="Exportar"
+              ariaLabel="Exportar registros"
             >
-              Exportar a Excel
-            </button>
+              <IconDownload />
+            </IconButton>
             <button
               type="button"
               onClick={() => onLogout()}
@@ -149,15 +330,21 @@ export function AdminPanel({ role, onLogout }: Props) {
       </header>
 
       <main className="mx-auto max-w-6xl space-y-6 px-4 pt-6">
-        <div className="grid gap-3 sm:grid-cols-3">
-          <StatsCard title="Registros visibles" value={filtered.length} hint="Tras búsqueda y filtro" />
-          <StatsCard title="Planes distintos" value={uniquePlans} hint="En el resultado actual" />
-          <StatsCard
-            title="Acceso"
-            value={role === 'admin' ? 'Admin' : 'Lectura'}
-            hint={role === 'admin' ? 'Puede eliminar registros' : 'Sin eliminación'}
-          />
-        </div>
+        {sessionExpiryWarning ? (
+          <SessionExpiryBanner message={sessionExpiryWarning.message} onDismiss={sessionExpiryWarning.onDismiss} />
+        ) : null}
+
+        {!focused ? (
+          <div className="grid gap-3 sm:grid-cols-3">
+            <StatsCard title="Registros visibles" value={filtered.length} hint="Tras búsqueda y filtro" />
+            <StatsCard title="Planes distintos" value={uniquePlans} hint="En el resultado actual" />
+            <StatsCard
+              title="Acceso"
+              value={role === 'admin' ? 'Admin' : 'Lectura'}
+            hint={role === 'admin' ? 'Control total' : 'Solo lectura'}
+            />
+          </div>
+        ) : null}
 
         <div className="rounded-xl border border-neutral-800 bg-neutral-900/50 p-4">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
@@ -174,37 +361,41 @@ export function AdminPanel({ role, onLogout }: Props) {
                 className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2.5 text-sm text-neutral-100 outline-none ring-amber-500/0 focus:border-neutral-600 focus:ring-2 focus:ring-amber-500/25"
               />
             </div>
-            <div className="w-full lg:w-48">
-              <label htmlFor="plan" className="text-xs font-medium uppercase text-neutral-500">
-                Plan
-              </label>
-              <select
-                id="plan"
-                value={planFilter}
-                onChange={(e) => setPlanFilter(e.target.value as PlanFilterValue)}
-                className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2.5 text-sm text-neutral-100 outline-none focus:border-neutral-600 focus:ring-2 focus:ring-amber-500/25"
-              >
-                {PLAN_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="w-full lg:w-44">
-              <label htmlFor="sort" className="text-xs font-medium uppercase text-neutral-500">
-                Orden
-              </label>
-              <select
-                id="sort"
-                value={sortOrder}
-                onChange={(e) => setSortOrder(e.target.value as SortOrder)}
-                className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2.5 text-sm text-neutral-100 outline-none focus:border-neutral-600 focus:ring-2 focus:ring-amber-500/25"
-              >
-                <option value="desc">Fecha · más recientes</option>
-                <option value="asc">Fecha · más antiguos</option>
-              </select>
-            </div>
+            {!focused ? (
+              <>
+                <div className="w-full lg:w-48">
+                  <label htmlFor="plan" className="text-xs font-medium uppercase text-neutral-500">
+                    Plan
+                  </label>
+                  <select
+                    id="plan"
+                    value={planFilter}
+                    onChange={(e) => setPlanFilter(e.target.value as PlanFilterValue)}
+                    className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2.5 text-sm text-neutral-100 outline-none focus:border-neutral-600 focus:ring-2 focus:ring-amber-500/25"
+                  >
+                    {PLAN_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="w-full lg:w-44">
+                  <label htmlFor="sort" className="text-xs font-medium uppercase text-neutral-500">
+                    Orden
+                  </label>
+                  <select
+                    id="sort"
+                    value={sortOrder}
+                    onChange={(e) => setSortOrder(e.target.value as SortOrder)}
+                    className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2.5 text-sm text-neutral-100 outline-none focus:border-neutral-600 focus:ring-2 focus:ring-amber-500/25"
+                  >
+                    <option value="desc">Fecha · más recientes</option>
+                    <option value="asc">Fecha · más antiguos</option>
+                  </select>
+                </div>
+              </>
+            ) : null}
           </div>
           {copyFeedback ? (
             <p className="mt-3 text-sm text-amber-400/90">{copyFeedback}</p>
@@ -217,20 +408,50 @@ export function AdminPanel({ role, onLogout }: Props) {
           </div>
         ) : null}
 
-        <CotizacionesTable
-          rows={filtered}
-          role={role}
-          busyId={busyId}
-          onCopyEmail={handleCopyEmail}
-          onDetails={(row) => setDetailsRow(row)}
-          onDelete={handleDelete}
-        />
+        {viewMode === 'list' ? (
+          <CotizacionesTable
+            rows={filtered}
+            role={role}
+            busyId={busyId}
+            onCopyEmail={handleCopyEmail}
+            onDetails={(row) => setDetailsRow(row)}
+            onDelete={handleDelete}
+          />
+        ) : (
+          <CotizacionesGrid
+            rows={filtered}
+            role={role}
+            busyId={busyId}
+            onDetails={(row) => setDetailsRow(row)}
+            onDelete={handleDelete}
+          />
+        )}
 
         <p className="text-center text-xs text-neutral-600">
           ID de documento disponible en la exportación CSV · Actualización manual de lista
         </p>
       </main>
-      <DetailsModal open={Boolean(detailsRow)} row={detailsRow} onClose={() => setDetailsRow(null)} />
+      <DetailsModal
+        open={Boolean(detailsRow)}
+        row={detailsRow}
+        role={role}
+        busyId={busyId}
+        onDelete={(row) => {
+          void handleDelete(row);
+          setDetailsRow(null);
+        }}
+        onClose={() => setDetailsRow(null)}
+      />
+      <SidePanel
+        open={sideOpen}
+        role={role}
+        viewMode={viewMode}
+        focused={focused}
+        onClose={() => setSideOpen(false)}
+        onToggleFocused={toggleFocused}
+        onToggleView={toggleView}
+        onRefresh={() => void load()}
+      />
     </div>
   );
 }
