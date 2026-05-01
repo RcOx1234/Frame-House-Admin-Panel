@@ -15,6 +15,7 @@ type Props = {
   role: PanelRole;
   onLogout: () => void;
   sessionExpiryWarning?: { message: string; onDismiss: () => void } | null;
+  sessionContext: { uid: string; deviceId: string; sessionId: string | null };
 };
 
 const PLAN_OPTIONS: { value: PlanFilterValue; label: string }[] = [
@@ -155,7 +156,7 @@ function IconDownload() {
   );
 }
 
-export function AdminPanel({ role, onLogout, sessionExpiryWarning }: Props) {
+export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContext }: Props) {
   const [rows, setRows] = useState<CotizacionDoc[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -171,6 +172,9 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning }: Props) {
   });
   const [focused, setFocused] = useState<boolean>(() => localStorage.getItem('fh_focused') === '1');
   const [sideOpen, setSideOpen] = useState(false);
+  const [sessions, setSessions] = useState<import('../services/sessions').SessionDoc[]>([]);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
+  const [sessionsError, setSessionsError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -263,6 +267,26 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning }: Props) {
       return next;
     });
   }
+
+  const loadSessions = useCallback(async () => {
+    if (role !== 'admin') return;
+    setSessionsLoading(true);
+    setSessionsError(null);
+    try {
+      const { listSessions } = await import('../services/sessions');
+      const data = await listSessions({ limit: 80 });
+      setSessions(data);
+    } catch (err) {
+      setSessionsError(err instanceof Error ? err.message : 'No se pudieron cargar las sesiones.');
+    } finally {
+      setSessionsLoading(false);
+    }
+  }, [role]);
+
+  useEffect(() => {
+    if (role !== 'admin') return;
+    void loadSessions();
+  }, [loadSessions, role]);
 
   return (
     <div className="min-h-screen bg-neutral-950 pb-12">
@@ -451,6 +475,11 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning }: Props) {
         onToggleFocused={toggleFocused}
         onToggleView={toggleView}
         onRefresh={() => void load()}
+        sessions={sessions}
+        sessionsLoading={sessionsLoading}
+        sessionsError={sessionsError}
+        onRefreshSessions={() => void loadSessions()}
+        sessionContext={sessionContext}
       />
     </div>
   );

@@ -1,6 +1,9 @@
 import { useMemo, useState, type FormEvent } from 'react';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { getAuthClient } from '../firebase';
+import { getDeviceId } from '../utils/deviceId';
+import { getSessionById, sessionIdFor, upsertSession } from '../services/sessions';
+import type { PanelRole } from '../types/cotizacion';
 
 type Props = {
   onSuccess: () => void;
@@ -48,10 +51,28 @@ export function LoginCard({ onSuccess }: Props) {
         return;
       }
 
-      await signInWithEmailAndPassword(getAuthClient(), email, password);
+      const credential = await signInWithEmailAndPassword(getAuthClient(), email, password);
+      const deviceId = getDeviceId();
+      const sid = sessionIdFor(credential.user.uid, deviceId);
+      const existing = await getSessionById(sid);
+      if (existing?.blocked) {
+        await signOut(getAuthClient());
+        setError('Tu acceso está bloqueado. Contacta al administrador.');
+        return;
+      }
+
       localStorage.setItem('fh_login_at', String(Date.now()));
       localStorage.removeItem(LS_ATTEMPTS_KEY);
       localStorage.removeItem(LS_BLOCK_UNTIL_KEY);
+
+      const role: PanelRole = isAdmin ? 'admin' : 'guest';
+      await upsertSession({
+        uid: credential.user.uid,
+        email: credential.user.email || email,
+        role,
+        deviceId,
+      });
+
       onSuccess();
     } catch {
       const attempts = getAttempts();

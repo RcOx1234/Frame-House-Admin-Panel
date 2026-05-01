@@ -1,10 +1,22 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { onAuthStateChanged, signOut, type User } from 'firebase/auth';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { LoginCard } from './components/LoginCard';
 import { AdminPanel } from './pages/AdminPanel';
 import type { PanelRole } from './types/cotizacion';
 import { getAuthClient } from './firebase';
 import { SessionExpiredScreen } from './components/SessionExpiredScreen';
+import { BlockedScreen } from './components/BlockedScreen';
+import { getDeviceId } from './utils/deviceId';
+import { getDb } from './firebase';
+import {
+  getSessionById,
+  markSessionInactive,
+  sessionIdFor,
+  touchSession,
+  type SessionDoc,
+  upsertSession,
+} from './services/sessions';
 
 const ADMIN_EMAIL = 'admin@framehouse.com';
 const GUEST_EMAIL = 'invitado@framehouse.com';
@@ -17,6 +29,8 @@ export default function App() {
   const [sessionExpired, setSessionExpired] = useState(false);
   const [showExpiryWarning, setShowExpiryWarning] = useState(false);
   const warningDismissedRef = useRef(false);
+  const [blocked, setBlocked] = useState(false);
+  const [currentSession, setCurrentSession] = useState<SessionDoc | null>(null);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(getAuthClient(), (u) => {
@@ -25,6 +39,82 @@ export default function App() {
     });
     return () => unsub();
   }, []);
+
+  useEffect(() => {
+    if (!user) {
+      setCurrentSession(null);
+      return;
+    }
+
+    let unsub: (() => void) | null = null;
+    let cancelled = false;
+
+    const run = async () => {
+      const deviceId = getDeviceId();
+      const role: PanelRole = user.email === ADMIN_EMAIL ? 'admin' : 'guest';
+      const sid = sessionIdFor(user.uid, deviceId);
+
+      // Verificación inmediata de bloqueo antes de continuar.
+      const existing = await getSessionById(sid);
+      if (existing?.blocked) {
+        setBlocked(true);
+        await signOut(getAuthClient());
+        return;
+      }
+
+      // Garantiza sesión actual y limpia flags previos antes de escuchar.
+      const sessionId = await upsertSession({
+        uid: user.uid,
+        email: user.email || '',
+        role,
+        deviceId,
+      });
+
+      if (cancelled) return;
+      const ref = doc(getDb(), 'sessions', sessionId);
+      unsub = onSnapshot(ref, async (snap) => {
+        if (!snap.exists()) return;
+        const data = snap.data() as Record<string, unknown>;
+        const blockedValue = typeof data.blocked === 'boolean' ? data.blocked : false;
+        const forceLogoutValue = typeof data.forceLogout === 'boolean' ? data.forceLogout : false;
+        const session: SessionDoc = {
+          id: snap.id,
+          uid: typeof data.uid === 'string' ? data.uid : user.uid,
+          email: typeof data.email === 'string' ? data.email : user.email || '',
+          role: data.role === 'admin' ? 'admin' : 'guest',
+          deviceId: typeof data.deviceId === 'string' ? data.deviceId : deviceId,
+          createdAt: (data.createdAt as SessionDoc['createdAt']) ?? null,
+          lastSeen: (data.lastSeen as SessionDoc['lastSeen']) ?? null,
+          isActive: typeof data.isActive === 'boolean' ? data.isActive : !(blockedValue || forceLogoutValue),
+          blocked: blockedValue,
+          forceLogout: forceLogoutValue,
+        };
+        setCurrentSession(session);
+
+        if (blockedValue || forceLogoutValue) {
+          setBlocked(true);
+          await signOut(getAuthClient());
+        }
+      });
+    };
+
+    void run();
+    return () => {
+      cancelled = true;
+      if (unsub) unsub();
+    };
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    if (!currentSession?.id) return;
+    if (blocked) return;
+
+    const id = window.setInterval(() => {
+      void touchSession(currentSession.id);
+    }, 60_000);
+    return () => window.clearInterval(id);
+  }, [blocked, currentSession?.id, user]);
 
   useEffect(() => {
     if (!user) return;
@@ -41,6 +131,9 @@ export default function App() {
         setShowExpiryWarning(false);
         setSessionExpired(true);
         localStorage.removeItem(LS_LOGIN_AT_KEY);
+        if (currentSession?.id) {
+          await markSessionInactive(currentSession.id);
+        }
         await signOut(getAuthClient());
       }
     };
@@ -48,7 +141,7 @@ export default function App() {
     void tick();
     const id = window.setInterval(() => void tick(), 15_000);
     return () => window.clearInterval(id);
-  }, [user]);
+  }, [currentSession?.id, user]);
 
   useEffect(() => {
     if (!user) return;
@@ -96,6 +189,10 @@ export default function App() {
     setShowExpiryWarning(false);
     warningDismissedRef.current = false;
     setSessionExpired(false);
+    setBlocked(false);
+    if (currentSession?.id) {
+      await markSessionInactive(currentSession.id);
+    }
     await signOut(getAuthClient());
   }
 
@@ -121,6 +218,19 @@ export default function App() {
     );
   }
 
+  if (blocked) {
+    return (
+      <BlockedScreen
+        onBackToLogin={() => {
+          setBlocked(false);
+          setSessionExpired(false);
+          setShowExpiryWarning(false);
+          warningDismissedRef.current = false;
+        }}
+      />
+    );
+  }
+
   if (!user || !role) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-neutral-950 px-4 py-12">
@@ -133,6 +243,11 @@ export default function App() {
     <AdminPanel
       role={role}
       onLogout={handleLogout}
+      sessionContext={
+        currentSession
+          ? { uid: currentSession.uid, deviceId: currentSession.deviceId, sessionId: currentSession.id }
+          : { uid: user.uid, deviceId: getDeviceId(), sessionId: sessionIdFor(user.uid, getDeviceId()) }
+      }
       sessionExpiryWarning={
         showExpiryWarning
           ? {
