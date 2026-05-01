@@ -57,7 +57,8 @@ export function sessionIdFor(uid: string, deviceId: string): string {
   return `${uid}_${deviceId}`;
 }
 
-export async function upsertSession(input: {
+/** Tras login con contraseña: limpia cierre remoto y marca sesión activa. */
+export async function upsertSessionOnLogin(input: {
   uid: string;
   email: string;
   role: PanelRole;
@@ -87,6 +88,49 @@ export async function upsertSession(input: {
   );
 
   return id;
+}
+
+/**
+ * Restauración de Firebase Auth (pestaña/navegador): NO toca forceLogout ni blocked,
+ * para no borrar un cierre remoto pendiente antes de detectarlo.
+ */
+export async function upsertSessionOnAuthRestore(input: {
+  uid: string;
+  email: string;
+  role: PanelRole;
+  deviceId: string;
+}): Promise<string> {
+  const db = getDb();
+  const id = sessionIdFor(input.uid, input.deviceId);
+  const ref = doc(db, 'sessions', id);
+
+  const existing = await getDoc(ref);
+  const createdAt = existing.exists() ? undefined : serverTimestamp();
+
+  await setDoc(
+    ref,
+    {
+      uid: input.uid,
+      email: input.email,
+      role: input.role,
+      deviceId: input.deviceId,
+      ...(createdAt ? { createdAt, blocked: false, forceLogout: false } : {}),
+      lastSeen: serverTimestamp(),
+      isActive: true,
+    },
+    { merge: true }
+  );
+
+  return id;
+}
+
+export async function acknowledgeRemoteLogout(id: string): Promise<void> {
+  const db = getDb();
+  await updateDoc(doc(db, 'sessions', id), {
+    forceLogout: false,
+    isActive: false,
+    lastSeen: serverTimestamp(),
+  });
 }
 
 export async function getSessionById(id: string): Promise<SessionDoc | null> {

@@ -7,21 +7,24 @@ import type { PanelRole } from './types/cotizacion';
 import { getAuthClient } from './firebase';
 import { SessionExpiredScreen } from './components/SessionExpiredScreen';
 import { BlockedScreen } from './components/BlockedScreen';
+import { SessionClosedScreen } from './components/SessionClosedScreen';
 import { getDeviceId } from './utils/deviceId';
 import { getDb } from './firebase';
 import {
+  acknowledgeRemoteLogout,
   getSessionById,
   markSessionInactive,
   sessionIdFor,
   touchSession,
   type SessionDoc,
-  upsertSession,
+  upsertSessionOnAuthRestore,
 } from './services/sessions';
 
 const ADMIN_EMAIL = 'admin@framehouse.com';
 const GUEST_EMAIL = 'invitado@framehouse.com';
 const SESSION_TTL_MS = 10 * 60 * 1000; // 10 minutos
 const LS_LOGIN_AT_KEY = 'fh_login_at';
+const LS_LOGIN_FLOW_KEY = 'fh_login_flow';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -29,7 +32,8 @@ export default function App() {
   const [sessionExpired, setSessionExpired] = useState(false);
   const [showExpiryWarning, setShowExpiryWarning] = useState(false);
   const warningDismissedRef = useRef(false);
-  const [blocked, setBlocked] = useState(false);
+  const [accessDenied, setAccessDenied] = useState<null | 'blocked' | 'remote_logout'>(null);
+  const [remoteLogoutSessionId, setRemoteLogoutSessionId] = useState<string | null>(null);
   const [currentSession, setCurrentSession] = useState<SessionDoc | null>(null);
 
   useEffect(() => {
@@ -57,13 +61,34 @@ export default function App() {
       // Verificación inmediata de bloqueo antes de continuar.
       const existing = await getSessionById(sid);
       if (existing?.blocked) {
-        setBlocked(true);
+        setAccessDenied('blocked');
         await signOut(getAuthClient());
         return;
       }
 
-      // Garantiza sesión actual y limpia flags previos antes de escuchar.
-      const sessionId = await upsertSession({
+      if (existing?.forceLogout && !existing.blocked) {
+        // Evita falso positivo en la primera restauración tras login.
+        if (localStorage.getItem(LS_LOGIN_FLOW_KEY) === '1') {
+          await new Promise((resolve) => window.setTimeout(resolve, 1200));
+          const refreshed = await getSessionById(sid);
+          if (!refreshed?.forceLogout) {
+            // Ya se limpió el cierre remoto por el login actual.
+          } else {
+            setRemoteLogoutSessionId(sid);
+            setAccessDenied('remote_logout');
+            await signOut(getAuthClient());
+            return;
+          }
+        } else {
+        setRemoteLogoutSessionId(sid);
+        setAccessDenied('remote_logout');
+        await signOut(getAuthClient());
+        return;
+        }
+      }
+
+      // Sesión restaurada por Auth persistente: no borrar forceLogout aquí.
+      const sessionId = await upsertSessionOnAuthRestore({
         uid: user.uid,
         email: user.email || '',
         role,
@@ -91,8 +116,14 @@ export default function App() {
         };
         setCurrentSession(session);
 
-        if (blockedValue || forceLogoutValue) {
-          setBlocked(true);
+        if (blockedValue) {
+          setAccessDenied('blocked');
+          await signOut(getAuthClient());
+          return;
+        }
+        if (forceLogoutValue) {
+          setRemoteLogoutSessionId(snap.id);
+          setAccessDenied('remote_logout');
           await signOut(getAuthClient());
         }
       });
@@ -108,13 +139,13 @@ export default function App() {
   useEffect(() => {
     if (!user) return;
     if (!currentSession?.id) return;
-    if (blocked) return;
+    if (accessDenied) return;
 
     const id = window.setInterval(() => {
       void touchSession(currentSession.id);
     }, 60_000);
     return () => window.clearInterval(id);
-  }, [blocked, currentSession?.id, user]);
+  }, [accessDenied, currentSession?.id, user]);
 
   useEffect(() => {
     if (!user) return;
@@ -189,7 +220,8 @@ export default function App() {
     setShowExpiryWarning(false);
     warningDismissedRef.current = false;
     setSessionExpired(false);
-    setBlocked(false);
+    setAccessDenied(null);
+    setRemoteLogoutSessionId(null);
     if (currentSession?.id) {
       await markSessionInactive(currentSession.id);
     }
@@ -218,11 +250,29 @@ export default function App() {
     );
   }
 
-  if (blocked) {
+  if (accessDenied === 'blocked') {
     return (
       <BlockedScreen
         onBackToLogin={() => {
-          setBlocked(false);
+          setAccessDenied(null);
+          setRemoteLogoutSessionId(null);
+          setSessionExpired(false);
+          setShowExpiryWarning(false);
+          warningDismissedRef.current = false;
+        }}
+      />
+    );
+  }
+
+  if (accessDenied === 'remote_logout') {
+    return (
+      <SessionClosedScreen
+        onBackToLogin={() => {
+          if (remoteLogoutSessionId) {
+            void acknowledgeRemoteLogout(remoteLogoutSessionId);
+          }
+          setAccessDenied(null);
+          setRemoteLogoutSessionId(null);
           setSessionExpired(false);
           setShowExpiryWarning(false);
           warningDismissedRef.current = false;

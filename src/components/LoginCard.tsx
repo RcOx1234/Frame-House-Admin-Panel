@@ -2,7 +2,7 @@ import { useMemo, useState, type FormEvent } from 'react';
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { getAuthClient } from '../firebase';
 import { getDeviceId } from '../utils/deviceId';
-import { getSessionById, sessionIdFor, upsertSession } from '../services/sessions';
+import { getSessionById, sessionIdFor, upsertSessionOnLogin } from '../services/sessions';
 import type { PanelRole } from '../types/cotizacion';
 
 type Props = {
@@ -13,6 +13,7 @@ const MAX_ATTEMPTS = 5;
 const BLOCK_TIME = 5 * 60 * 1000; // 5 minutos
 const LS_ATTEMPTS_KEY = 'loginAttempts';
 const LS_BLOCK_UNTIL_KEY = 'blockUntil';
+const LS_LOGIN_FLOW_KEY = 'fh_login_flow';
 
 const ADMIN_EMAIL = 'admin@framehouse.com';
 const GUEST_EMAIL = 'invitado@framehouse.com';
@@ -43,6 +44,8 @@ export function LoginCard({ onSuccess }: Props) {
     }
 
     setLoading(true);
+    localStorage.setItem(LS_LOGIN_FLOW_KEY, '1');
+    let loginSucceeded = false;
     try {
       const blockUntil = getBlockUntil();
       if (Date.now() < blockUntil) {
@@ -66,13 +69,14 @@ export function LoginCard({ onSuccess }: Props) {
       localStorage.removeItem(LS_BLOCK_UNTIL_KEY);
 
       const role: PanelRole = isAdmin ? 'admin' : 'guest';
-      await upsertSession({
+      await upsertSessionOnLogin({
         uid: credential.user.uid,
         email: credential.user.email || email,
         role,
         deviceId,
       });
 
+      loginSucceeded = true;
       onSuccess();
     } catch {
       const attempts = getAttempts();
@@ -88,6 +92,11 @@ export function LoginCard({ onSuccess }: Props) {
         setError(`Credenciales incorrectas. Intento ${newAttempts} de ${MAX_ATTEMPTS}.`);
       }
     } finally {
+      if (loginSucceeded) {
+        window.setTimeout(() => localStorage.removeItem(LS_LOGIN_FLOW_KEY), 2500);
+      } else {
+        localStorage.removeItem(LS_LOGIN_FLOW_KEY);
+      }
       setLoading(false);
     }
   }
