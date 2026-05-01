@@ -22,6 +22,9 @@ export function SessionsSection({
   onRefresh,
 }: Props) {
   const [details, setDetails] = useState<SessionDoc | null>(null);
+  const [editingAliasSessionId, setEditingAliasSessionId] = useState<string | null>(null);
+  const [aliasDraft, setAliasDraft] = useState('');
+  const [aliasSaving, setAliasSaving] = useState(false);
   const sorted = useMemo(() => [...sessions], [sessions]);
 
   const canManage = role === 'admin';
@@ -51,10 +54,45 @@ export function SessionsSection({
     await deleteSession(s.id);
     onRefresh();
   }
+  function openAliasEditor(s: SessionDoc) {
+    if (!canManage) return;
+    setEditingAliasSessionId(s.id);
+    setAliasDraft(s.alias ?? '');
+  }
+  async function saveAlias(sessionId: string) {
+    if (!canManage) return;
+    setAliasSaving(true);
+    const { updateSessionAlias } = await import('../services/sessions');
+    await updateSessionAlias(sessionId, aliasDraft);
+    setAliasSaving(false);
+    setEditingAliasSessionId(null);
+    setAliasDraft('');
+    onRefresh();
+  }
 
   const statusText = (s: SessionDoc) =>
     s.blocked ? 'Bloqueada' : s.forceLogout ? 'Cerrada' : s.isActive ? 'Activa' : 'Inactiva';
   const asDate = (value: SessionDoc['createdAt']) => (value ? value.toDate().toLocaleString() : '—');
+  const sessionTitle = (s: SessionDoc) => s.alias || s.email || s.deviceName || s.deviceId || '—';
+  const isEditingAlias = (sessionId: string) => editingAliasSessionId === sessionId;
+
+  function IconPencil() {
+    return (
+      <svg
+        className="h-3.5 w-3.5"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M12 20h9" />
+        <path d="M16.5 3.5a2.12 2.12 0 1 1 3 3L7 19l-4 1 1-4Z" />
+      </svg>
+    );
+  }
 
   return (
     <section className="space-y-4">
@@ -87,7 +125,7 @@ export function SessionsSection({
               <div key={s.id} className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-3">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-neutral-100">{s.email || '—'}</p>
+                    <p className="truncate text-sm font-semibold text-neutral-100">{sessionTitle(s)}</p>
                     {isSelf ? <p className="mt-0.5 text-[11px] text-amber-300">Sesión actual</p> : null}
                     <p className="mt-0.5 text-[11px] text-neutral-500">{s.role === 'admin' ? 'Admin' : 'Guest'}</p>
                   </div>
@@ -143,7 +181,45 @@ export function SessionsSection({
                   >
                     Eliminar
                   </button>
+                  <button
+                    type="button"
+                    disabled={!canManage}
+                    onClick={() => openAliasEditor(s)}
+                    className="rounded-md border border-neutral-700 bg-neutral-900 p-1.5 text-neutral-200 disabled:opacity-50"
+                    title="Editar alias"
+                    aria-label="Editar alias"
+                  >
+                    <IconPencil />
+                  </button>
                 </div>
+                {isEditingAlias(s.id) ? (
+                  <div className="mt-2 flex items-center gap-1.5">
+                    <input
+                      value={aliasDraft}
+                      onChange={(e) => setAliasDraft(e.target.value)}
+                      placeholder="Alias de sesión"
+                      className="w-full rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1 text-[11px] text-neutral-100 outline-none focus:border-neutral-600"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => void saveAlias(s.id)}
+                      disabled={aliasSaving}
+                      className="rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1 text-[11px] text-neutral-200 disabled:opacity-50"
+                    >
+                      Guardar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingAliasSessionId(null);
+                        setAliasDraft('');
+                      }}
+                      className="rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1 text-[11px] text-neutral-200"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                ) : null}
               </div>
             );
           })}
@@ -167,7 +243,7 @@ export function SessionsSection({
                   const isSelf = s.uid === sessionContext.uid && s.deviceId === sessionContext.deviceId;
                   return (
                     <tr key={s.id} className="hover:bg-neutral-800/30">
-                      <td className="px-4 py-3 text-neutral-100">{s.email || '—'}</td>
+                      <td className="px-4 py-3 text-neutral-100">{sessionTitle(s)}</td>
                       <td className="px-4 py-3 text-neutral-300">{s.role === 'admin' ? 'Admin' : 'Guest'}</td>
                       <td className="px-4 py-3 text-neutral-400">{s.deviceName || s.deviceId}</td>
                       <td className="px-4 py-3 text-neutral-400">
@@ -220,7 +296,45 @@ export function SessionsSection({
                           >
                             Eliminar
                           </button>
+                          <button
+                            type="button"
+                            disabled={!canManage}
+                            onClick={() => openAliasEditor(s)}
+                            className="rounded-md border border-neutral-700 bg-neutral-900 p-1.5 text-neutral-200 disabled:opacity-50"
+                            title="Editar alias"
+                            aria-label="Editar alias"
+                          >
+                            <IconPencil />
+                          </button>
                         </div>
+                        {isEditingAlias(s.id) ? (
+                          <div className="mt-2 flex justify-end gap-1.5">
+                            <input
+                              value={aliasDraft}
+                              onChange={(e) => setAliasDraft(e.target.value)}
+                              placeholder="Alias de sesión"
+                              className="w-56 rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1 text-[11px] text-neutral-100 outline-none focus:border-neutral-600"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => void saveAlias(s.id)}
+                              disabled={aliasSaving}
+                              className="rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1 text-[11px] text-neutral-200 disabled:opacity-50"
+                            >
+                              Guardar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingAliasSessionId(null);
+                                setAliasDraft('');
+                              }}
+                              className="rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1 text-[11px] text-neutral-200"
+                            >
+                              Cancelar
+                            </button>
+                          </div>
+                        ) : null}
                       </td>
                     </tr>
                   );
@@ -254,11 +368,14 @@ export function SessionsSection({
             </div>
             <div className="mt-4 grid gap-2 text-sm text-neutral-300 sm:grid-cols-2">
               <p><span className="text-neutral-500">Email:</span> {details.email || '—'}</p>
+              <p><span className="text-neutral-500">Alias:</span> {details.alias || '—'}</p>
               <p><span className="text-neutral-500">UID:</span> {details.uid || '—'}</p>
               <p><span className="text-neutral-500">Rol:</span> {details.role}</p>
               <p><span className="text-neutral-500">deviceId:</span> {details.deviceId}</p>
               <p><span className="text-neutral-500">Dispositivo:</span> {details.deviceName || 'N/A'}</p>
+              <p><span className="text-neutral-500">Tipo dispositivo:</span> {details.deviceType || 'N/A'}</p>
               <p><span className="text-neutral-500">Navegador:</span> {details.browser || 'N/A'}</p>
+              <p><span className="text-neutral-500">OS:</span> {details.os || 'N/A'}</p>
               <p><span className="text-neutral-500">País:</span> {details.country || 'N/A'}</p>
               <p><span className="text-neutral-500">Ciudad:</span> {details.city || 'N/A'}</p>
               <p><span className="text-neutral-500">blocked:</span> {details.blocked ? 'true' : 'false'}</p>

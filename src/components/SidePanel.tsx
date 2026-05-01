@@ -15,7 +15,6 @@ type Props = {
   onOpenGallery: () => void;
   onOpenRegistros: () => void;
   onOpenSessions: () => void;
-  onCreateGalleryProject: () => void;
   sessions: SessionDoc[];
   sessionsLoading: boolean;
   sessionsError: string | null;
@@ -78,7 +77,6 @@ export function SidePanel({
   onOpenGallery,
   onOpenRegistros,
   onOpenSessions,
-  onCreateGalleryProject,
   sessions,
   sessionsLoading,
   sessionsError,
@@ -143,20 +141,13 @@ export function SidePanel({
               >
                 <IconGallery /> Galería
               </button>
-              <button
-                type="button"
-                onClick={onOpenSessions}
-                className={navChipClass(section === 'sesiones')}
-              >
-                <IconSessions /> Sesiones
-              </button>
-              {role === 'admin' && section === 'galeria' ? (
+              {role === 'admin' ? (
                 <button
                   type="button"
-                  onClick={onCreateGalleryProject}
-                  className="rounded-lg border border-amber-500/30 bg-amber-950/30 px-3 py-2 text-sm text-amber-200"
+                  onClick={onOpenSessions}
+                  className={navChipClass(section === 'sesiones')}
                 >
-                  Crear nuevo
+                  <IconSessions /> Sesiones
                 </button>
               ) : null}
             </div>
@@ -204,6 +195,7 @@ export function SidePanel({
               <p className="text-sm text-neutral-400">
                 Tu sesión actual y las 2 sesiones más recientes.
               </p>
+              <p className="text-xs text-neutral-500">Total sesiones: {sessions.length}</p>
 
               <div className="flex flex-wrap items-center gap-2">
                 <button
@@ -225,7 +217,7 @@ export function SidePanel({
                   const recentOthers = sessions
                     .filter((s) => !(s.uid === sessionContext.uid && s.deviceId === sessionContext.deviceId))
                     .slice(0, 2);
-                  const list = [current, ...recentOthers].filter(Boolean) as SessionDoc[];
+                  const list = [...recentOthers, current].filter(Boolean) as SessionDoc[];
                   if (!list.length) return <p className="text-sm text-neutral-500">Aún no hay sesiones cargadas.</p>;
                   return list.map((s, idx) => {
                     const statusLabel = s.blocked ? 'Bloqueada' : s.forceLogout ? 'Cerrada' : s.isActive ? 'Activa' : 'Inactiva';
@@ -235,7 +227,9 @@ export function SidePanel({
                       <div key={`${s.id}-${idx}`} className="rounded-lg border border-neutral-800 bg-neutral-950/50 p-2">
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
-                            <p className="truncate text-xs font-medium text-neutral-200">{s.email || '—'}</p>
+                            <p className="truncate text-xs font-medium text-neutral-200">
+                              {s.alias || s.email || s.deviceName || s.deviceId || '—'}
+                            </p>
                             <p className="mt-0.5 truncate text-[11px] text-neutral-500">
                               {s.deviceName || s.deviceId} · {s.country || 'N/A'} · {s.city || 'N/A'}
                             </p>

@@ -127,10 +127,16 @@ export default function App() {
           id: snap.id,
           uid: typeof data.uid === 'string' ? data.uid : user.uid,
           email: typeof data.email === 'string' ? data.email : user.email || '',
+          alias: typeof data.alias === 'string' && data.alias.trim() ? data.alias : null,
           role: data.role === 'admin' ? 'admin' : 'guest',
           deviceId: typeof data.deviceId === 'string' ? data.deviceId : deviceId,
           deviceName: typeof data.deviceName === 'string' ? data.deviceName : '',
+          deviceType:
+            data.deviceType === 'mobile' || data.deviceType === 'desktop' || data.deviceType === 'tablet'
+              ? data.deviceType
+              : 'unknown',
           browser: typeof data.browser === 'string' ? data.browser : '',
+          os: typeof data.os === 'string' ? data.os : '',
           country: typeof data.country === 'string' ? data.country : '',
           city: typeof data.city === 'string' ? data.city : '',
           createdAt: (data.createdAt as SessionDoc['createdAt']) ?? null,

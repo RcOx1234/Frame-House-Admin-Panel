@@ -188,7 +188,6 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContex
     const saved = localStorage.getItem('fh_sessions_view_mode');
     return saved === 'list' ? 'list' : 'cards';
   });
-  const [galleryCreateSignal, setGalleryCreateSignal] = useState(0);
   const [galleryReloadSignal, setGalleryReloadSignal] = useState(0);
   const [sessions, setSessions] = useState<import('../services/sessions').SessionDoc[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
@@ -543,7 +542,7 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContex
         ) : section === 'galeria' ? (
           <GallerySection
             role={role}
-            createSignal={galleryCreateSignal}
+            createSignal={0}
             reloadSignal={galleryReloadSignal}
             viewMode={galleryViewMode}
           />
@@ -590,11 +589,6 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContex
         }}
         onOpenRegistros={() => {
           openSection('registros');
-          setSideOpen(false);
-        }}
-        onCreateGalleryProject={() => {
-          openSection('galeria');
-          setGalleryCreateSignal((n) => n + 1);
           setSideOpen(false);
         }}
         sessions={sessions}
