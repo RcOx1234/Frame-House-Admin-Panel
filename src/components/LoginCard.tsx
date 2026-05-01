@@ -14,6 +14,7 @@ const BLOCK_TIME = 5 * 60 * 1000; // 5 minutos
 const LS_ATTEMPTS_KEY = 'loginAttempts';
 const LS_BLOCK_UNTIL_KEY = 'blockUntil';
 const LS_LOGIN_FLOW_KEY = 'fh_login_flow';
+const LS_LAST_ACTIVE_AT_KEY = 'fh_last_active_at';
 
 const ADMIN_EMAIL = 'admin@framehouse.com';
 const GUEST_EMAIL = 'invitado@framehouse.com';
@@ -65,6 +66,7 @@ export function LoginCard({ onSuccess }: Props) {
       }
 
       localStorage.setItem('fh_login_at', String(Date.now()));
+      localStorage.setItem(LS_LAST_ACTIVE_AT_KEY, String(Date.now()));
       localStorage.removeItem(LS_ATTEMPTS_KEY);
       localStorage.removeItem(LS_BLOCK_UNTIL_KEY);
 

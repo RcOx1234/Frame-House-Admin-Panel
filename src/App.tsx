@@ -25,6 +25,7 @@ const GUEST_EMAIL = 'invitado@framehouse.com';
 const SESSION_TTL_MS = 10 * 60 * 1000; // 10 minutos
 const LS_LOGIN_AT_KEY = 'fh_login_at';
 const LS_LOGIN_FLOW_KEY = 'fh_login_flow';
+const LS_LAST_ACTIVE_AT_KEY = 'fh_last_active_at';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -35,6 +36,17 @@ export default function App() {
   const [accessDenied, setAccessDenied] = useState<null | 'blocked' | 'remote_logout'>(null);
   const [remoteLogoutSessionId, setRemoteLogoutSessionId] = useState<string | null>(null);
   const [currentSession, setCurrentSession] = useState<SessionDoc | null>(null);
+
+  async function expireSessionNow(sessionId?: string | null) {
+    localStorage.removeItem(LS_LOGIN_AT_KEY);
+    localStorage.removeItem(LS_LAST_ACTIVE_AT_KEY);
+    setShowExpiryWarning(false);
+    setSessionExpired(true);
+    if (sessionId) {
+      await markSessionInactive(sessionId);
+    }
+    await signOut(getAuthClient());
+  }
 
   useEffect(() => {
     const unsub = onAuthStateChanged(getAuthClient(), (u) => {
@@ -57,6 +69,14 @@ export default function App() {
       const deviceId = getDeviceId();
       const role: PanelRole = user.email === ADMIN_EMAIL ? 'admin' : 'guest';
       const sid = sessionIdFor(user.uid, deviceId);
+      const loginAt = Number(localStorage.getItem(LS_LOGIN_AT_KEY) || 0);
+      const lastActiveAt = Number(localStorage.getItem(LS_LAST_ACTIVE_AT_KEY) || 0);
+      const baseTs = Math.max(loginAt, lastActiveAt);
+
+      if (baseTs && Date.now() - baseTs > SESSION_TTL_MS) {
+        await expireSessionNow(sid);
+        return;
+      }
 
       // Verificación inmediata de bloqueo antes de continuar.
       const existing = await getSessionById(sid);
@@ -94,6 +114,7 @@ export default function App() {
         role,
         deviceId,
       });
+      localStorage.setItem(LS_LAST_ACTIVE_AT_KEY, String(Date.now()));
 
       if (cancelled) return;
       const ref = doc(getDb(), 'sessions', sessionId);
@@ -142,10 +163,35 @@ export default function App() {
     if (accessDenied) return;
 
     const id = window.setInterval(() => {
+      localStorage.setItem(LS_LAST_ACTIVE_AT_KEY, String(Date.now()));
       void touchSession(currentSession.id);
     }, 60_000);
     return () => window.clearInterval(id);
   }, [accessDenied, currentSession?.id, user]);
+
+  useEffect(() => {
+    if (!user) return;
+    if (!currentSession?.id) return;
+
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') {
+        void markSessionInactive(currentSession.id);
+      } else {
+        localStorage.setItem(LS_LAST_ACTIVE_AT_KEY, String(Date.now()));
+      }
+    };
+
+    const onPageHide = () => {
+      void markSessionInactive(currentSession.id);
+    };
+
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('pagehide', onPageHide);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('pagehide', onPageHide);
+    };
+  }, [currentSession?.id, user]);
 
   useEffect(() => {
     if (!user) return;
@@ -159,13 +205,7 @@ export default function App() {
     const tick = async () => {
       if (!user) return;
       if (isExpired()) {
-        setShowExpiryWarning(false);
-        setSessionExpired(true);
-        localStorage.removeItem(LS_LOGIN_AT_KEY);
-        if (currentSession?.id) {
-          await markSessionInactive(currentSession.id);
-        }
-        await signOut(getAuthClient());
+        await expireSessionNow(currentSession?.id);
       }
     };
 
@@ -217,6 +257,7 @@ export default function App() {
 
   async function handleLogout() {
     localStorage.removeItem(LS_LOGIN_AT_KEY);
+    localStorage.removeItem(LS_LAST_ACTIVE_AT_KEY);
     setShowExpiryWarning(false);
     warningDismissedRef.current = false;
     setSessionExpired(false);
