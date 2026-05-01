@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useLockBodyScrollMobile } from '../hooks/useLockBodyScrollMobile';
 import type { CotizacionDoc } from '../types/cotizacion';
 import { dateFromFirestore, formatUsd } from '../utils/formatters';
 import type { PanelRole } from '../types/cotizacion';
@@ -20,6 +21,8 @@ function formatDateEs(value: CotizacionDoc['creadoEn']): string {
 
 export function DetailsModal({ open, row, role, onClose, onDelete, busyId }: Props) {
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
+
+  useLockBodyScrollMobile(open && Boolean(row));
 
   useEffect(() => {
     if (!open) return;

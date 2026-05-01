@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useLockBodyScrollMobile } from '../hooks/useLockBodyScrollMobile';
 import type { FilterType, Project, ProjectType } from '../types/project';
 import { generateProjectId } from '../utils/projectsId';
 
@@ -43,6 +44,8 @@ function defaultProject(projects: Project[]): Project {
 export function ProjectFormModal({ open, mode, projects, initialProject, onClose, onSubmit }: Props) {
   const [model, setModel] = useState<Project>(() => defaultProject(projects));
   const [tagsText, setTagsText] = useState('');
+
+  useLockBodyScrollMobile(open);
 
   useEffect(() => {
     if (!open) return;

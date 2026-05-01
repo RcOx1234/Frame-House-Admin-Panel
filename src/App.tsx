@@ -334,7 +334,7 @@ export default function App() {
 
   if (!user || !role) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-neutral-950 px-4 py-12">
+      <div className="flex min-h-screen items-center justify-center bg-neutral-950 px-4 py-12 max-md:h-[100dvh] max-md:min-h-0 max-md:overflow-hidden max-md:py-6">
         <LoginCard onSuccess={() => {}} />
       </div>
     );

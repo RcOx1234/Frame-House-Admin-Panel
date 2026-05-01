@@ -54,7 +54,8 @@ function IconButton({
   );
 }
 
-function IconPanelLeft() {
+/** Panel lateral a la derecha: contenido + franja (mismo patrón que el SidePanel). */
+function IconSidebarTools() {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -64,13 +65,11 @@ function IconPanelLeft() {
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
-      className="h-4 w-4"
+      className="h-5 w-5"
       aria-hidden="true"
     >
-      <path d="M3 4h18" />
-      <path d="M3 12h18" />
-      <path d="M3 20h18" />
-      <path d="M8 4v16" />
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <line x1="15" y1="4" x2="15" y2="20" />
     </svg>
   );
 }
@@ -356,10 +355,10 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContex
           <div className="flex flex-wrap gap-2">
             <IconButton
               onClick={() => setSideOpen(true)}
-              title="Panel lateral"
+              title="Panel lateral · herramientas"
               ariaLabel="Abrir panel lateral"
             >
-              <IconPanelLeft />
+              <IconSidebarTools />
             </IconButton>
             <IconButton
               onClick={toggleView}

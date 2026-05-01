@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { useLockBodyScrollMobile } from '../hooks/useLockBodyScrollMobile';
 import type { Project } from '../types/project';
 
 type Props = {
@@ -9,6 +10,8 @@ type Props = {
 };
 
 export function ProjectDetailsModal({ open, project, onClose, onCopyId }: Props) {
+  useLockBodyScrollMobile(open && Boolean(project));
+
   useEffect(() => {
     if (!open) return;
     function onKeyDown(e: KeyboardEvent) {

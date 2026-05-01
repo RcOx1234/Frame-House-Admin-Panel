@@ -162,17 +162,22 @@ export function GallerySection({ role, createSignal = 0, reloadSignal = 0, viewM
           Cargando proyectos...
         </div>
       ) : viewMode === 'cards' ? (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-3 max-sm:gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((p) => (
-            <div key={p.id} className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-3">
-              <img src={p.thumbnail} alt={p.title} className="h-40 w-full rounded-lg object-cover" loading="lazy" />
-              <div className="mt-3">
+            <div key={p.id} className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-3 max-sm:p-2">
+              <img
+                src={p.thumbnail}
+                alt={p.title}
+                className="h-40 max-sm:h-32 w-full rounded-lg object-cover"
+                loading="lazy"
+              />
+              <div className="mt-3 max-sm:mt-2">
                 <p className="text-xs text-neutral-500">{p.type}</p>
-                <h3 className="mt-1 truncate text-sm font-semibold text-neutral-100">{p.title}</h3>
+                <h3 className="mt-1 truncate text-sm font-semibold text-neutral-100 max-sm:text-[13px]">{p.title}</h3>
                 <p className="mt-1 truncate text-xs text-neutral-400">{p.client}</p>
                 <p className="mt-1 text-xs text-neutral-500">{p.format}</p>
               </div>
-              <div className="mt-3 flex flex-wrap gap-2">
+              <div className="mt-3 max-sm:mt-2 flex flex-wrap gap-2 max-sm:gap-1.5">
                 <button
                   type="button"
                   onClick={() => setDetails(p)}

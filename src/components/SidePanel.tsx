@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { useLockBodyScrollMobile } from '../hooks/useLockBodyScrollMobile';
 import type { PanelRole } from '../types/cotizacion';
 import type { SessionDoc } from '../services/sessions';
 
@@ -83,6 +84,8 @@ export function SidePanel({
   onRefreshSessions,
   sessionContext,
 }: Props) {
+  useLockBodyScrollMobile(open);
+
   useEffect(() => {
     if (!open) return;
     function onKeyDown(e: KeyboardEvent) {

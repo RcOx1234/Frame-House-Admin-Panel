@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useLockBodyScrollMobile } from '../hooks/useLockBodyScrollMobile';
 import type { SessionDoc } from '../services/sessions';
 import type { PanelRole } from '../types/cotizacion';
 
@@ -22,6 +23,7 @@ export function SessionsSection({
   onRefresh,
 }: Props) {
   const [details, setDetails] = useState<SessionDoc | null>(null);
+  useLockBodyScrollMobile(Boolean(details));
   const [editingAliasSessionId, setEditingAliasSessionId] = useState<string | null>(null);
   const [aliasDraft, setAliasDraft] = useState('');
   const [aliasSaving, setAliasSaving] = useState(false);
