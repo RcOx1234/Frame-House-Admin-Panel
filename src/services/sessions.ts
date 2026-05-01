@@ -21,6 +21,10 @@ export type SessionDoc = {
   email: string;
   role: PanelRole;
   deviceId: string;
+  deviceName: string;
+  browser: string;
+  country: string;
+  city: string;
   createdAt: Timestamp | null;
   lastSeen: Timestamp | null;
   isActive: boolean;
@@ -45,6 +49,10 @@ function mapSession(id: string, data: Record<string, unknown>): SessionDoc {
     email: asString(data.email),
     role: (data.role === 'admin' ? 'admin' : 'guest') satisfies PanelRole,
     deviceId: asString(data.deviceId),
+    deviceName: asString(data.deviceName),
+    browser: asString(data.browser),
+    country: asString(data.country),
+    city: asString(data.city),
     createdAt: (data.createdAt as Timestamp | null | undefined) ?? null,
     lastSeen: (data.lastSeen as Timestamp | null | undefined) ?? null,
     isActive: typeof data.isActive === 'boolean' ? data.isActive : !(blocked || forceLogout),
@@ -55,6 +63,29 @@ function mapSession(id: string, data: Record<string, unknown>): SessionDoc {
 
 export function sessionIdFor(uid: string, deviceId: string): string {
   return `${uid}_${deviceId}`;
+}
+
+function getClientMeta() {
+  const ua = navigator.userAgent || '';
+  const browser = /Edg/i.test(ua)
+    ? 'Edge'
+    : /Chrome/i.test(ua)
+      ? 'Chrome'
+      : /Firefox/i.test(ua)
+        ? 'Firefox'
+        : /Safari/i.test(ua)
+          ? 'Safari'
+          : 'Navegador';
+  const deviceName = navigator.platform ? `${navigator.platform} · ${browser}` : browser;
+  const locale = navigator.language || 'es-ES';
+  const parts = locale.split('-');
+  const country = parts[1] ? parts[1].toUpperCase() : 'N/A';
+  return {
+    deviceName,
+    browser,
+    country,
+    city: 'N/A',
+  };
 }
 
 /** Tras login con contraseña: limpia cierre remoto y marca sesión activa. */
@@ -70,6 +101,7 @@ export async function upsertSessionOnLogin(input: {
 
   const existing = await getDoc(ref);
   const createdAt = existing.exists() ? undefined : serverTimestamp();
+  const meta = getClientMeta();
 
   await setDoc(
     ref,
@@ -78,6 +110,7 @@ export async function upsertSessionOnLogin(input: {
       email: input.email,
       role: input.role,
       deviceId: input.deviceId,
+      ...meta,
       ...(createdAt ? { createdAt } : {}),
       lastSeen: serverTimestamp(),
       isActive: true,
@@ -106,6 +139,7 @@ export async function upsertSessionOnAuthRestore(input: {
 
   const existing = await getDoc(ref);
   const createdAt = existing.exists() ? undefined : serverTimestamp();
+  const meta = getClientMeta();
 
   await setDoc(
     ref,
@@ -114,6 +148,7 @@ export async function upsertSessionOnAuthRestore(input: {
       email: input.email,
       role: input.role,
       deviceId: input.deviceId,
+      ...meta,
       ...(createdAt ? { createdAt, blocked: false, forceLogout: false } : {}),
       lastSeen: serverTimestamp(),
       isActive: true,

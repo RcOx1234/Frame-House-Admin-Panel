@@ -12,6 +12,7 @@ import { CotizacionesGrid } from '../components/CotizacionesGrid';
 import { SidePanel } from '../components/SidePanel';
 import { SessionExpiryBanner } from '../components/SessionExpiryBanner';
 import { GallerySection } from '../components/GallerySection';
+import { SessionsSection } from '../components/SessionsSection';
 type Props = {
   role: PanelRole;
   onLogout: () => void;
@@ -177,9 +178,15 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContex
   });
   const [focused, setFocused] = useState<boolean>(() => localStorage.getItem('fh_focused') === '1');
   const [sideOpen, setSideOpen] = useState(false);
-  const [section, setSection] = useState<'registros' | 'galeria'>(() => {
+  const [section, setSection] = useState<'registros' | 'galeria' | 'sesiones'>(() => {
     const saved = localStorage.getItem('fh_admin_section');
-    return saved === 'galeria' ? 'galeria' : 'registros';
+    if (saved === 'galeria') return 'galeria';
+    if (saved === 'sesiones') return 'sesiones';
+    return 'registros';
+  });
+  const [sessionsViewMode, setSessionsViewMode] = useState<'cards' | 'list'>(() => {
+    const saved = localStorage.getItem('fh_sessions_view_mode');
+    return saved === 'list' ? 'list' : 'cards';
   });
   const [galleryCreateSignal, setGalleryCreateSignal] = useState(0);
   const [galleryReloadSignal, setGalleryReloadSignal] = useState(0);
@@ -272,6 +279,14 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContex
       });
       return;
     }
+    if (section === 'sesiones') {
+      setSessionsViewMode((v) => {
+        const next = v === 'cards' ? 'list' : 'cards';
+        localStorage.setItem('fh_sessions_view_mode', next);
+        return next;
+      });
+      return;
+    }
     setGalleryViewMode((v) => {
       const next = v === 'cards' ? 'list' : 'cards';
       localStorage.setItem('fh_gallery_view_mode', next);
@@ -287,7 +302,7 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContex
     });
   }
 
-  function openSection(next: 'registros' | 'galeria') {
+  function openSection(next: 'registros' | 'galeria' | 'sesiones') {
     setSection(next);
     localStorage.setItem('fh_admin_section', next);
   }
@@ -310,6 +325,10 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContex
   function reloadCurrentSection() {
     if (section === 'registros') {
       void load();
+      return;
+    }
+    if (section === 'sesiones') {
+      void loadSessions();
       return;
     }
     setGalleryReloadSignal((n) => n + 1);
@@ -350,24 +369,36 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContex
                   ? viewMode === 'list'
                     ? 'Cambiar a cuadrícula'
                     : 'Cambiar a lista'
-                  : galleryViewMode === 'cards'
-                    ? 'Cambiar a lista'
-                    : 'Cambiar a cards'
+                  : section === 'sesiones'
+                    ? sessionsViewMode === 'cards'
+                      ? 'Cambiar a lista'
+                      : 'Cambiar a cards'
+                    : galleryViewMode === 'cards'
+                      ? 'Cambiar a lista'
+                      : 'Cambiar a cards'
               }
               ariaLabel={
                 section === 'registros'
                   ? viewMode === 'list'
                     ? 'Cambiar a cuadrícula'
                     : 'Cambiar a lista'
-                  : galleryViewMode === 'cards'
-                    ? 'Cambiar a lista'
-                    : 'Cambiar a cards'
+                  : section === 'sesiones'
+                    ? sessionsViewMode === 'cards'
+                      ? 'Cambiar a lista'
+                      : 'Cambiar a cards'
+                    : galleryViewMode === 'cards'
+                      ? 'Cambiar a lista'
+                      : 'Cambiar a cards'
               }
             >
               {section === 'registros'
                 ? viewMode === 'list'
                   ? <IconGrid />
                   : <IconList />
+                : section === 'sesiones'
+                  ? sessionsViewMode === 'cards'
+                    ? <IconList />
+                    : <IconGrid />
                 : galleryViewMode === 'cards'
                   ? <IconList />
                   : <IconGrid />}
@@ -509,12 +540,22 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContex
               ID de documento disponible en la exportación CSV · Actualización manual de lista
             </p>
           </>
-        ) : (
+        ) : section === 'galeria' ? (
           <GallerySection
             role={role}
             createSignal={galleryCreateSignal}
             reloadSignal={galleryReloadSignal}
             viewMode={galleryViewMode}
+          />
+        ) : (
+          <SessionsSection
+            role={role}
+            sessions={sessions}
+            loading={sessionsLoading}
+            error={sessionsError}
+            viewMode={sessionsViewMode}
+            sessionContext={sessionContext}
+            onRefresh={() => void loadSessions()}
           />
         )}
       </main>
@@ -532,7 +573,7 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContex
       <SidePanel
         open={sideOpen}
         role={role}
-        viewMode={section === 'registros' ? viewMode : galleryViewMode}
+        viewMode={section === 'registros' ? viewMode : section === 'sesiones' ? sessionsViewMode : galleryViewMode}
         focused={focused}
         section={section}
         onClose={() => setSideOpen(false)}
@@ -541,6 +582,10 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContex
         onRefresh={reloadCurrentSection}
         onOpenGallery={() => {
           openSection('galeria');
+          setSideOpen(false);
+        }}
+        onOpenSessions={() => {
+          openSection('sesiones');
           setSideOpen(false);
         }}
         onOpenRegistros={() => {
