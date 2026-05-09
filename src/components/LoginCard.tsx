@@ -107,7 +107,7 @@ export function LoginCard({ onSuccess }: Props) {
   return (
     <div className="panel-modal-panel mx-auto w-full max-w-md p-8 shadow-xl backdrop-blur-sm">
       <h1 className="text-center text-xl font-semibold tracking-tight text-neutral-900 dark:text-neutral-100">
-        Panel de administrador de FRAME HOUSE
+        Frame House Admin Panel
       </h1>
       <p className="mt-2 text-center text-sm text-neutral-600 dark:text-neutral-500">
         Acceso interno · cotizaciones
