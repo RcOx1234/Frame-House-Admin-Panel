@@ -1,6 +1,7 @@
 import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
 import { getAuth, type Auth } from 'firebase/auth';
 import { getFirestore, type Firestore } from 'firebase/firestore';
+import { getFunctions, type Functions } from 'firebase/functions';
 
 function firebaseConfig() {
   return {
@@ -16,6 +17,7 @@ function firebaseConfig() {
 let app: FirebaseApp | undefined;
 let db: Firestore | undefined;
 let auth: Auth | undefined;
+let functionsUsCentral1: Functions | undefined;
 
 function getApp(): FirebaseApp {
   const cfg = firebaseConfig();
@@ -42,4 +44,22 @@ export function getAuthClient(): Auth {
     auth = getAuth(getApp());
   }
   return auth;
+}
+
+/**
+ * Cliente Firebase Functions en `us-central1` (misma región que las callables desplegadas).
+ * Usar solo con `httpsCallable` — nunca fetch ni URL manual a cloudfunctions.net.
+ *
+ * @example const fn = httpsCallable(functions(), 'setImageKitPrivateKey');
+ */
+export function functions(): Functions {
+  if (!functionsUsCentral1) {
+    functionsUsCentral1 = getFunctions(getApp(), 'us-central1');
+  }
+  return functionsUsCentral1;
+}
+
+/** Alias del mismo cliente (compatibilidad). */
+export function getFunctionsClient(): Functions {
+  return functions();
 }

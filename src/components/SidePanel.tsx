@@ -8,7 +8,7 @@ type Props = {
   role: PanelRole;
   viewMode: 'list' | 'grid' | 'cards';
   focused: boolean;
-  section: 'registros' | 'galeria' | 'sesiones';
+  section: 'registros' | 'galeria' | 'sesiones' | 'configuraciones';
   onClose: () => void;
   onToggleView: () => void;
   onToggleFocused: () => void;
@@ -16,6 +16,7 @@ type Props = {
   onOpenGallery: () => void;
   onOpenRegistros: () => void;
   onOpenSessions: () => void;
+  onOpenConfig: () => void;
   sessions: SessionDoc[];
   sessionsLoading: boolean;
   sessionsError: string | null;
@@ -24,15 +25,15 @@ type Props = {
 };
 
 function SectionTitle({ children }: { children: string }) {
-  return <h3 className="text-xs font-medium uppercase tracking-wide text-neutral-500">{children}</h3>;
+  return <h3 className="panel-label">{children}</h3>;
 }
 
 function navChipClass(active: boolean): string {
   return [
-    'inline-flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition',
+    'inline-flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition duration-200',
     active
-      ? 'border-amber-500/35 bg-amber-950/40 text-amber-200'
-      : 'border-neutral-700 bg-neutral-900/80 text-neutral-300 hover:bg-neutral-800',
+      ? 'border-amber-500/40 bg-amber-100/80 text-amber-950 dark:border-amber-500/35 dark:bg-amber-950/40 dark:text-amber-200'
+      : 'border-neutral-200 bg-neutral-50 text-neutral-700 hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-900/80 dark:text-neutral-300 dark:hover:bg-neutral-800',
   ].join(' ');
 }
 
@@ -65,6 +66,15 @@ function IconSessions() {
   );
 }
 
+function IconConfig() {
+  return (
+    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+      <circle cx="12" cy="12" r="3" />
+      <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+    </svg>
+  );
+}
+
 export function SidePanel({
   open,
   role,
@@ -78,6 +88,7 @@ export function SidePanel({
   onOpenGallery,
   onOpenRegistros,
   onOpenSessions,
+  onOpenConfig,
   sessions,
   sessionsLoading,
   sessionsError,
@@ -106,28 +117,24 @@ export function SidePanel({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <aside className="absolute right-0 top-0 h-full w-full max-w-md overflow-y-auto border-l border-neutral-800 bg-neutral-950 shadow-2xl">
-        <div className="flex items-start justify-between gap-4 border-b border-neutral-800 px-6 py-4">
+      <aside className="absolute right-0 top-0 h-full w-full max-w-md overflow-y-auto border-l border-neutral-200 bg-white shadow-2xl dark:border-neutral-800 dark:bg-neutral-950">
+        <div className="flex items-start justify-between gap-4 border-b border-neutral-200 px-6 py-4 dark:border-neutral-800">
           <div>
-            <h2 className="text-base font-semibold text-neutral-100">Herramientas</h2>
-            <p className="mt-1 text-sm text-neutral-500">
+            <h2 className="text-base font-semibold text-neutral-900 dark:text-neutral-100">Herramientas</h2>
+            <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-500">
               Sesión:{' '}
-              <span className="text-neutral-300">
+              <span className="text-neutral-800 dark:text-neutral-300">
                 {role === 'admin' ? 'Administrador' : 'Invitado (solo lectura)'}
               </span>
             </p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg border border-neutral-700 px-3 py-1.5 text-sm font-medium text-neutral-300 transition hover:border-neutral-600 hover:text-neutral-100"
-          >
+          <button type="button" onClick={onClose} className="panel-btn-secondary py-1.5 text-xs">
             Cerrar
           </button>
         </div>
 
         <div className="space-y-6 px-6 py-5">
-          <section className="space-y-3 rounded-2xl border border-neutral-800 bg-neutral-900/30 p-4">
+          <section className="panel-card-muted space-y-3 rounded-2xl p-4">
             <SectionTitle>Secciones</SectionTitle>
             <div className="space-y-2">
               <button
@@ -145,48 +152,47 @@ export function SidePanel({
                 <IconGallery /> Galería
               </button>
               {role === 'admin' ? (
-                <button
-                  type="button"
-                  onClick={onOpenSessions}
-                  className={navChipClass(section === 'sesiones')}
-                >
-                  <IconSessions /> Sesiones
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={onOpenSessions}
+                    className={navChipClass(section === 'sesiones')}
+                  >
+                    <IconSessions /> Sesiones
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onOpenConfig}
+                    className={navChipClass(section === 'configuraciones')}
+                  >
+                    <IconConfig /> Configuraciones
+                  </button>
+                </>
               ) : null}
             </div>
           </section>
 
-          <section className="space-y-3 rounded-2xl border border-neutral-800 bg-neutral-900/30 p-4">
+          <section className="panel-card-muted space-y-3 rounded-2xl p-4">
             <SectionTitle>Vista</SectionTitle>
             <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={onToggleView}
-                className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm font-medium text-neutral-200 transition hover:bg-neutral-800"
-              >
-                Cambiar a{' '}
-                {section === 'registros'
-                  ? viewMode === 'list'
-                    ? 'cuadrícula'
-                    : 'lista'
-                  : viewMode === 'cards'
-                    ? 'lista'
-                    : 'cards'}
-              </button>
+              {section !== 'configuraciones' ? (
+                <button type="button" onClick={onToggleView} className="panel-btn-secondary text-xs">
+                  Cambiar a{' '}
+                  {section === 'registros'
+                    ? viewMode === 'list'
+                      ? 'cuadrícula'
+                      : 'lista'
+                    : viewMode === 'cards'
+                      ? 'lista'
+                      : 'cards'}
+                </button>
+              ) : null}
               {section === 'registros' ? (
-                <button
-                  type="button"
-                  onClick={onToggleFocused}
-                  className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm font-medium text-neutral-200 transition hover:bg-neutral-800"
-                >
+                <button type="button" onClick={onToggleFocused} className="panel-btn-secondary text-xs">
                   {focused ? 'Salir de modo registros' : 'Modo solo registros'}
                 </button>
               ) : null}
-              <button
-                type="button"
-                onClick={onRefresh}
-                className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm font-medium text-neutral-200 transition hover:bg-neutral-800"
-              >
+              <button type="button" onClick={onRefresh} className="panel-btn-secondary text-xs">
                 Refrescar
               </button>
             </div>

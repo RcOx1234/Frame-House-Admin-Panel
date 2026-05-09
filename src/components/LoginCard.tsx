@@ -4,6 +4,7 @@ import { getAuthClient } from '../firebase';
 import { getDeviceId } from '../utils/deviceId';
 import { getSessionById, sessionIdFor, upsertSessionOnLogin } from '../services/sessions';
 import type { PanelRole } from '../types/cotizacion';
+import { ADMIN_PANEL_EMAIL } from '../constants/auth';
 
 type Props = {
   onSuccess: () => void;
@@ -16,7 +17,7 @@ const LS_BLOCK_UNTIL_KEY = 'blockUntil';
 const LS_LOGIN_FLOW_KEY = 'fh_login_flow';
 const LS_LAST_ACTIVE_AT_KEY = 'fh_last_active_at';
 
-const ADMIN_EMAIL = 'admin@framehouse.com';
+const ADMIN_EMAIL = ADMIN_PANEL_EMAIL;
 const GUEST_EMAIL = 'invitado@framehouse.com';
 
 export function LoginCard({ onSuccess }: Props) {
@@ -104,11 +105,11 @@ export function LoginCard({ onSuccess }: Props) {
   }
 
   return (
-    <div className="mx-auto w-full max-w-md rounded-2xl border border-neutral-800 bg-neutral-900/80 p-8 shadow-xl backdrop-blur-sm">
-      <h1 className="text-center text-xl font-semibold tracking-tight text-neutral-100">
+    <div className="panel-modal-panel mx-auto w-full max-w-md p-8 shadow-xl backdrop-blur-sm">
+      <h1 className="text-center text-xl font-semibold tracking-tight text-neutral-900 dark:text-neutral-100">
         Panel de administrador de FRAME HOUSE
       </h1>
-      <p className="mt-2 text-center text-sm text-neutral-500">
+      <p className="mt-2 text-center text-sm text-neutral-600 dark:text-neutral-500">
         Acceso interno · cotizaciones
       </p>
 

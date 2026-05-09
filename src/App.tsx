@@ -19,8 +19,11 @@ import {
   type SessionDoc,
   upsertSessionOnAuthRestore,
 } from './services/sessions';
+import { ADMIN_PANEL_EMAIL } from './constants/auth';
+import { useTheme } from './context/ThemeContext';
+import { subscribeGeneralSettings } from './services/settingsFirestore';
 
-const ADMIN_EMAIL = 'admin@framehouse.com';
+const ADMIN_EMAIL = ADMIN_PANEL_EMAIL;
 const GUEST_EMAIL = 'invitado@framehouse.com';
 const SESSION_TTL_MS = 10 * 60 * 1000; // 10 minutos
 const LS_LOGIN_AT_KEY = 'fh_login_at';
@@ -28,6 +31,7 @@ const LS_LOGIN_FLOW_KEY = 'fh_login_flow';
 const LS_LAST_ACTIVE_AT_KEY = 'fh_last_active_at';
 
 export default function App() {
+  const { setTheme } = useTheme();
   const [user, setUser] = useState<User | null>(null);
   const [checking, setChecking] = useState(true);
   const [sessionExpired, setSessionExpired] = useState(false);
@@ -169,6 +173,14 @@ export default function App() {
 
   useEffect(() => {
     if (!user) return;
+    const unsub = subscribeGeneralSettings((s) => {
+      setTheme(s.theme);
+    });
+    return () => unsub();
+  }, [setTheme, user]);
+
+  useEffect(() => {
+    if (!user) return;
     if (!currentSession?.id) return;
     if (accessDenied) return;
 
@@ -281,8 +293,8 @@ export default function App() {
 
   if (checking) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-neutral-950 px-4 py-12">
-        <div className="rounded-xl border border-neutral-800 bg-neutral-900/50 px-5 py-4 text-sm text-neutral-400">
+      <div className="panel-shell flex items-center justify-center px-4 py-12">
+        <div className="panel-card-muted px-5 py-4 text-sm text-neutral-600 dark:text-neutral-400">
           Verificando sesión…
         </div>
       </div>
@@ -334,7 +346,7 @@ export default function App() {
 
   if (!user || !role) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-neutral-950 px-4 py-12 max-md:h-[100dvh] max-md:min-h-0 max-md:overflow-hidden max-md:py-6">
+      <div className="panel-shell flex items-center justify-center px-4 py-12 max-md:h-[100dvh] max-md:min-h-0 max-md:overflow-hidden max-md:py-6">
         <LoginCard onSuccess={() => {}} />
       </div>
     );

@@ -13,6 +13,7 @@ import { SidePanel } from '../components/SidePanel';
 import { SessionExpiryBanner } from '../components/SessionExpiryBanner';
 import { GallerySection } from '../components/GallerySection';
 import { SessionsSection } from '../components/SessionsSection';
+import { ConfiguracionesSection } from '../components/ConfiguracionesSection';
 type Props = {
   role: PanelRole;
   onLogout: () => void;
@@ -45,7 +46,7 @@ function IconButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-neutral-700 bg-neutral-900 text-neutral-200 transition hover:bg-neutral-800 disabled:opacity-50"
+      className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-neutral-300 bg-white text-neutral-800 transition hover:bg-neutral-50 active:scale-[0.98] disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800"
       aria-label={ariaLabel}
       title={title}
     >
@@ -177,10 +178,11 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContex
   });
   const [focused, setFocused] = useState<boolean>(() => localStorage.getItem('fh_focused') === '1');
   const [sideOpen, setSideOpen] = useState(false);
-  const [section, setSection] = useState<'registros' | 'galeria' | 'sesiones'>(() => {
+  const [section, setSection] = useState<'registros' | 'galeria' | 'sesiones' | 'configuraciones'>(() => {
     const saved = localStorage.getItem('fh_admin_section');
     if (saved === 'galeria') return 'galeria';
     if (saved === 'sesiones') return 'sesiones';
+    if (saved === 'configuraciones') return 'configuraciones';
     return 'registros';
   });
   const [sessionsViewMode, setSessionsViewMode] = useState<'cards' | 'list'>(() => {
@@ -188,6 +190,7 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContex
     return saved === 'list' ? 'list' : 'cards';
   });
   const [galleryReloadSignal, setGalleryReloadSignal] = useState(0);
+  const [configReloadSignal, setConfigReloadSignal] = useState(0);
   const [sessions, setSessions] = useState<import('../services/sessions').SessionDoc[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
   const [sessionsError, setSessionsError] = useState<string | null>(null);
@@ -269,6 +272,7 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContex
   }
 
   function toggleView() {
+    if (section === 'configuraciones') return;
     if (section === 'registros') {
       setViewMode((v) => {
         const next = v === 'list' ? 'grid' : 'list';
@@ -300,7 +304,7 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContex
     });
   }
 
-  function openSection(next: 'registros' | 'galeria' | 'sesiones') {
+  function openSection(next: 'registros' | 'galeria' | 'sesiones' | 'configuraciones') {
     setSection(next);
     localStorage.setItem('fh_admin_section', next);
   }
@@ -329,6 +333,10 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContex
       void loadSessions();
       return;
     }
+    if (section === 'configuraciones') {
+      setConfigReloadSignal((n) => n + 1);
+      return;
+    }
     setGalleryReloadSignal((n) => n + 1);
   }
 
@@ -337,17 +345,24 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContex
     void loadSessions();
   }, [loadSessions, role]);
 
+  useEffect(() => {
+    if (section === 'configuraciones' && role !== 'admin') {
+      setSection('registros');
+      localStorage.setItem('fh_admin_section', 'registros');
+    }
+  }, [role, section]);
+
   return (
-    <div className="min-h-screen bg-neutral-950 pb-12">
-      <header className="sticky top-0 z-10 border-b border-neutral-800 bg-neutral-950/90 backdrop-blur-md">
+    <div className="panel-shell pb-12">
+      <header className="panel-header-bar">
         <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-lg font-semibold text-neutral-100">
+            <h1 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
               Panel de administrador de FRAME HOUSE
             </h1>
-            <p className="text-sm text-neutral-500">
+            <p className="text-sm text-neutral-600 dark:text-neutral-500">
               Sesión:{' '}
-              <span className="text-neutral-300">
+              <span className="text-neutral-800 dark:text-neutral-300">
                 {role === 'admin' ? 'Administrador' : 'Invitado (solo lectura)'}
               </span>
             </p>
@@ -360,47 +375,49 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContex
             >
               <IconSidebarTools />
             </IconButton>
-            <IconButton
-              onClick={toggleView}
-              title={
-                section === 'registros'
+            {section !== 'configuraciones' ? (
+              <IconButton
+                onClick={toggleView}
+                title={
+                  section === 'registros'
+                    ? viewMode === 'list'
+                      ? 'Cambiar a cuadrícula'
+                      : 'Cambiar a lista'
+                    : section === 'sesiones'
+                      ? sessionsViewMode === 'cards'
+                        ? 'Cambiar a lista'
+                        : 'Cambiar a cards'
+                      : galleryViewMode === 'cards'
+                        ? 'Cambiar a lista'
+                        : 'Cambiar a cards'
+                }
+                ariaLabel={
+                  section === 'registros'
+                    ? viewMode === 'list'
+                      ? 'Cambiar a cuadrícula'
+                      : 'Cambiar a lista'
+                    : section === 'sesiones'
+                      ? sessionsViewMode === 'cards'
+                        ? 'Cambiar a lista'
+                        : 'Cambiar a cards'
+                      : galleryViewMode === 'cards'
+                        ? 'Cambiar a lista'
+                        : 'Cambiar a cards'
+                }
+              >
+                {section === 'registros'
                   ? viewMode === 'list'
-                    ? 'Cambiar a cuadrícula'
-                    : 'Cambiar a lista'
+                    ? <IconGrid />
+                    : <IconList />
                   : section === 'sesiones'
                     ? sessionsViewMode === 'cards'
-                      ? 'Cambiar a lista'
-                      : 'Cambiar a cards'
-                    : galleryViewMode === 'cards'
-                      ? 'Cambiar a lista'
-                      : 'Cambiar a cards'
-              }
-              ariaLabel={
-                section === 'registros'
-                  ? viewMode === 'list'
-                    ? 'Cambiar a cuadrícula'
-                    : 'Cambiar a lista'
-                  : section === 'sesiones'
-                    ? sessionsViewMode === 'cards'
-                      ? 'Cambiar a lista'
-                      : 'Cambiar a cards'
-                    : galleryViewMode === 'cards'
-                      ? 'Cambiar a lista'
-                      : 'Cambiar a cards'
-              }
-            >
-              {section === 'registros'
-                ? viewMode === 'list'
-                  ? <IconGrid />
-                  : <IconList />
-                : section === 'sesiones'
-                  ? sessionsViewMode === 'cards'
+                      ? <IconList />
+                      : <IconGrid />
+                  : galleryViewMode === 'cards'
                     ? <IconList />
-                    : <IconGrid />
-                : galleryViewMode === 'cards'
-                  ? <IconList />
-                  : <IconGrid />}
-            </IconButton>
+                    : <IconGrid />}
+              </IconButton>
+            ) : null}
             {section === 'registros' ? (
               <button
                 type="button"
@@ -429,11 +446,7 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContex
                 <IconDownload />
               </IconButton>
             ) : null}
-            <button
-              type="button"
-              onClick={() => onLogout()}
-              className="rounded-lg border border-neutral-700 px-3 py-2 text-sm font-medium text-neutral-400 transition hover:border-neutral-600 hover:text-neutral-200"
-            >
+            <button type="button" onClick={() => onLogout()} className="panel-btn-secondary text-neutral-700 dark:text-neutral-400">
               Salir
             </button>
           </div>
@@ -545,6 +558,10 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContex
             reloadSignal={galleryReloadSignal}
             viewMode={galleryViewMode}
           />
+        ) : section === 'configuraciones' ? (
+          role === 'admin' ? (
+            <ConfiguracionesSection reloadSignal={configReloadSignal} />
+          ) : null
         ) : (
           <SessionsSection
             role={role}
@@ -571,7 +588,15 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContex
       <SidePanel
         open={sideOpen}
         role={role}
-        viewMode={section === 'registros' ? viewMode : section === 'sesiones' ? sessionsViewMode : galleryViewMode}
+        viewMode={
+          section === 'registros'
+            ? viewMode
+            : section === 'sesiones'
+              ? sessionsViewMode
+              : section === 'configuraciones'
+                ? 'cards'
+                : galleryViewMode
+        }
         focused={focused}
         section={section}
         onClose={() => setSideOpen(false)}
@@ -584,6 +609,10 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContex
         }}
         onOpenSessions={() => {
           openSection('sesiones');
+          setSideOpen(false);
+        }}
+        onOpenConfig={() => {
+          openSection('configuraciones');
           setSideOpen(false);
         }}
         onOpenRegistros={() => {

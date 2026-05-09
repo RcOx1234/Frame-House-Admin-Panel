@@ -6,6 +6,7 @@ import {
   updateProject as updateProjectFs,
 } from '../services/projectsFirestore';
 import { useProjects } from '../hooks/useProjects';
+import { usePanelSettings } from '../hooks/usePanelSettings';
 import { ProjectDetailsModal } from './ProjectDetailsModal';
 import { ProjectFormModal } from './ProjectFormModal';
 
@@ -28,6 +29,7 @@ type Props = {
 
 export function GallerySection({ role, createSignal = 0, reloadSignal = 0, viewMode }: Props) {
   const { projects, reload, loading } = useProjects();
+  const { general, integrations } = usePanelSettings(true);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<FilterType>('Todos');
   const [featuredOnly, setFeaturedOnly] = useState(false);
@@ -35,8 +37,14 @@ export function GallerySection({ role, createSignal = 0, reloadSignal = 0, viewM
   const [formMode, setFormMode] = useState<'create' | 'edit'>('create');
   const [editing, setEditing] = useState<Project | null>(null);
   const [formOpen, setFormOpen] = useState(false);
+  const [formSubmitting, setFormSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const rows = projects as Project[];
+
+  const visibleProjects = useMemo(() => {
+    if (role === 'admin') return rows;
+    return rows.filter((p) => p.visible !== false);
+  }, [rows, role]);
 
   useEffect(() => {
     if (!createSignal) return;
@@ -50,7 +58,7 @@ export function GallerySection({ role, createSignal = 0, reloadSignal = 0, viewM
   }, [reload, reloadSignal]);
 
   const filtered = useMemo(() => {
-    let list = [...rows];
+    let list = [...visibleProjects];
     if (filter !== 'Todos') list = list.filter((p) => p.category === filter);
     if (featuredOnly) list = list.filter((p) => Boolean(p.featured));
     const q = query.trim().toLowerCase();
@@ -60,7 +68,7 @@ export function GallerySection({ role, createSignal = 0, reloadSignal = 0, viewM
       );
     }
     return list;
-  }, [featuredOnly, filter, query, rows]);
+  }, [featuredOnly, filter, query, visibleProjects]);
 
   function openCreate() {
     setFormMode('create');
@@ -75,19 +83,24 @@ export function GallerySection({ role, createSignal = 0, reloadSignal = 0, viewM
   }
 
   async function onSubmit(project: Project) {
-    if (formMode === 'create') {
-      const payload = { ...project };
-      delete payload.idDoc;
-      await createProjectFs(payload);
-    } else {
-      const idDoc = editing?.idDoc;
-      if (!idDoc) return;
-      const payload = { ...project };
-      delete payload.idDoc;
-      await updateProjectFs(idDoc, payload);
+    setFormSubmitting(true);
+    try {
+      if (formMode === 'create') {
+        const payload = { ...project };
+        delete payload.idDoc;
+        await createProjectFs(payload);
+      } else {
+        const idDoc = editing?.idDoc;
+        if (!idDoc) return;
+        const payload = { ...project };
+        delete payload.idDoc;
+        await updateProjectFs(idDoc, payload);
+      }
+      await reload();
+      setFormOpen(false);
+    } finally {
+      setFormSubmitting(false);
     }
-    await reload();
-    setFormOpen(false);
   }
 
   async function onDelete(project: Project) {
@@ -112,24 +125,24 @@ export function GallerySection({ role, createSignal = 0, reloadSignal = 0, viewM
   }
 
   return (
-    <section className="space-y-4">
-      <div className="rounded-xl border border-neutral-800 bg-neutral-900/50 p-4">
+    <section className="space-y-4 transition-opacity duration-300">
+      <div className="panel-card p-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
           <div className="flex-1">
-            <label className="text-xs uppercase text-neutral-500">Buscar</label>
+            <label className="panel-label">Buscar</label>
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Titulo, cliente o ID..."
-              className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2.5 text-sm text-neutral-100"
+              className="panel-input mt-1 w-full py-2.5"
             />
           </div>
           <div className="w-full lg:w-52">
-            <label className="text-xs uppercase text-neutral-500">Filtro</label>
+            <label className="panel-label">Filtro</label>
             <select
               value={filter}
               onChange={(e) => setFilter(e.target.value as FilterType)}
-              className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2.5 text-sm text-neutral-100"
+              className="panel-input mt-1 w-full py-2.5"
             >
               {FILTERS.map((f) => (
                 <option key={f} value={f}>
@@ -150,7 +163,7 @@ export function GallerySection({ role, createSignal = 0, reloadSignal = 0, viewM
             ) : null}
           </div>
         </div>
-        <label className="mt-3 inline-flex items-center gap-2 text-sm text-neutral-300">
+        <label className="mt-3 inline-flex items-center gap-2 text-sm text-neutral-700 dark:text-neutral-300">
           <input type="checkbox" checked={featuredOnly} onChange={(e) => setFeaturedOnly(e.target.checked)} />
           Solo destacados
         </label>
@@ -158,13 +171,16 @@ export function GallerySection({ role, createSignal = 0, reloadSignal = 0, viewM
       </div>
 
       {loading ? (
-        <div className="rounded-xl border border-neutral-800 bg-neutral-900/40 px-4 py-10 text-center text-sm text-neutral-400">
+        <div className="panel-card-muted px-4 py-10 text-center text-sm text-neutral-600 dark:text-neutral-400">
           Cargando proyectos...
         </div>
       ) : viewMode === 'cards' ? (
         <div className="grid gap-3 max-sm:gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((p) => (
-            <div key={p.id} className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-3 max-sm:p-2">
+            <div
+              key={p.id}
+              className="panel-card-muted rounded-2xl p-3 transition duration-200 hover:border-neutral-400/80 dark:hover:border-neutral-600 max-sm:p-2"
+            >
               <img
                 src={p.thumbnail}
                 alt={p.title}
@@ -173,15 +189,17 @@ export function GallerySection({ role, createSignal = 0, reloadSignal = 0, viewM
               />
               <div className="mt-3 max-sm:mt-2">
                 <p className="text-xs text-neutral-500">{p.type}</p>
-                <h3 className="mt-1 truncate text-sm font-semibold text-neutral-100 max-sm:text-[13px]">{p.title}</h3>
-                <p className="mt-1 truncate text-xs text-neutral-400">{p.client}</p>
+                <h3 className="mt-1 truncate text-sm font-semibold text-neutral-900 dark:text-neutral-100 max-sm:text-[13px]">
+                  {p.title}
+                </h3>
+                <p className="mt-1 truncate text-xs text-neutral-600 dark:text-neutral-400">{p.client}</p>
                 <p className="mt-1 text-xs text-neutral-500">{p.format}</p>
               </div>
               <div className="mt-3 max-sm:mt-2 flex flex-wrap gap-2 max-sm:gap-1.5">
                 <button
                   type="button"
                   onClick={() => setDetails(p)}
-                  className="rounded-lg border border-neutral-700 bg-neutral-900 px-2.5 py-1 text-xs text-neutral-200"
+                  className="panel-btn-secondary px-2.5 py-1 text-xs"
                 >
                   Ver detalles
                 </button>
@@ -190,7 +208,7 @@ export function GallerySection({ role, createSignal = 0, reloadSignal = 0, viewM
                     <button
                       type="button"
                       onClick={() => openEdit(p)}
-                      className="rounded-lg border border-neutral-700 bg-neutral-900 px-2.5 py-1 text-xs text-neutral-200"
+                      className="panel-btn-secondary px-2.5 py-1 text-xs"
                     >
                       Editar
                     </button>
@@ -215,11 +233,11 @@ export function GallerySection({ role, createSignal = 0, reloadSignal = 0, viewM
           ))}
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-neutral-800 bg-neutral-900/40">
+        <div className="panel-card-muted overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[860px] text-left text-sm">
               <thead>
-                <tr className="border-b border-neutral-800 bg-neutral-950/80 text-xs uppercase text-neutral-500">
+                <tr className="border-b border-neutral-200 bg-neutral-100/90 text-xs uppercase text-neutral-500 dark:border-neutral-800 dark:bg-neutral-950/80">
                   <th className="px-4 py-3">Thumb</th>
                   <th className="px-4 py-3">Titulo</th>
                   <th className="px-4 py-3">Cliente</th>
@@ -228,22 +246,22 @@ export function GallerySection({ role, createSignal = 0, reloadSignal = 0, viewM
                   <th className="px-4 py-3 text-right">Acciones</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-neutral-800/80">
+              <tbody className="divide-y divide-neutral-200/90 dark:divide-neutral-800/80">
                 {filtered.map((p) => (
-                  <tr key={p.id} className="hover:bg-neutral-800/30">
+                  <tr key={p.id} className="transition-colors hover:bg-neutral-100/80 dark:hover:bg-neutral-800/30">
                     <td className="px-4 py-3">
                       <img src={p.thumbnail} alt={p.title} className="h-10 w-16 rounded object-cover" />
                     </td>
-                    <td className="px-4 py-3 text-neutral-100">{p.title}</td>
-                    <td className="px-4 py-3 text-neutral-300">{p.client}</td>
-                    <td className="px-4 py-3 text-neutral-400">{p.type}</td>
-                    <td className="px-4 py-3 text-neutral-400">{p.format}</td>
+                    <td className="px-4 py-3 text-neutral-900 dark:text-neutral-100">{p.title}</td>
+                    <td className="px-4 py-3 text-neutral-700 dark:text-neutral-300">{p.client}</td>
+                    <td className="px-4 py-3 text-neutral-600 dark:text-neutral-400">{p.type}</td>
+                    <td className="px-4 py-3 text-neutral-600 dark:text-neutral-400">{p.format}</td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex justify-end gap-2">
                         <button
                           type="button"
                           onClick={() => setDetails(p)}
-                          className="rounded-lg border border-neutral-700 bg-neutral-900 px-2.5 py-1 text-xs text-neutral-200"
+                          className="panel-btn-secondary px-2.5 py-1 text-xs"
                         >
                           Ver
                         </button>
@@ -252,7 +270,7 @@ export function GallerySection({ role, createSignal = 0, reloadSignal = 0, viewM
                             <button
                               type="button"
                               onClick={() => openEdit(p)}
-                              className="rounded-lg border border-neutral-700 bg-neutral-900 px-2.5 py-1 text-xs text-neutral-200"
+                              className="panel-btn-secondary px-2.5 py-1 text-xs"
                             >
                               Editar
                             </button>
@@ -276,17 +294,26 @@ export function GallerySection({ role, createSignal = 0, reloadSignal = 0, viewM
       )}
 
       {!filtered.length ? (
-        <div className="rounded-xl border border-dashed border-neutral-800 bg-neutral-900/30 px-4 py-10 text-center text-sm text-neutral-500">
+        <div className="rounded-xl border border-dashed border-neutral-300 bg-neutral-50/80 px-4 py-10 text-center text-sm text-neutral-600 dark:border-neutral-800 dark:bg-neutral-900/30 dark:text-neutral-500">
           No hay proyectos con los filtros actuales.
         </div>
       ) : null}
 
-      <ProjectDetailsModal open={Boolean(details)} project={details} onClose={() => setDetails(null)} onCopyId={onCopyId} />
+      <ProjectDetailsModal
+        open={Boolean(details)}
+        project={details}
+        useVideoPreview={general.useVideoPreview}
+        onClose={() => setDetails(null)}
+        onCopyId={onCopyId}
+      />
       <ProjectFormModal
         open={formOpen}
         mode={formMode}
         projects={rows}
         initialProject={editing}
+        general={general}
+        integrations={integrations}
+        submitting={formSubmitting}
         onClose={() => setFormOpen(false)}
         onSubmit={onSubmit}
       />

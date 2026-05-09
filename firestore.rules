@@ -3,19 +3,76 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     match /cotizaciones/{docId} {
-      // Solo usuarios autenticados pueden leer
       allow read: if request.auth != null;
 
-      // SOLO admin puede eliminar
       allow delete: if request.auth != null
         && request.auth.token.email == "admin@framehouse.com";
 
-      // Permitir escritura desde el formulario (ajustable luego)
       allow create: if true;
+    }
 
-      // El panel no edita cotizaciones
-      allow update: if false;
+    match /sessions/{sessionId} {
+
+      allow read: if request.auth != null;
+
+      allow create: if request.auth != null
+        && request.resource.data.uid == request.auth.uid;
+
+      allow update: if request.auth != null && (
+        request.auth.uid == resource.data.uid ||
+        request.auth.token.email == "admin@framehouse.com"
+      );
+
+      allow delete: if request.auth != null
+        && request.auth.token.email == "admin@framehouse.com";
+    }
+
+    match /projects/{projectId} {
+
+      allow read: if true;
+
+      allow create: if request.auth != null
+        && request.auth.token.email == "admin@framehouse.com";
+
+      allow update: if request.auth != null
+        && request.auth.token.email == "admin@framehouse.com";
+
+      allow delete: if request.auth != null
+        && request.auth.token.email == "admin@framehouse.com";
+    }
+
+    // =========================
+    // CONFIGURACIONES PANEL
+    // =========================
+
+    match /panel_settings/{docId} {
+
+      allow read: if request.auth != null
+        && request.auth.token.email == "admin@framehouse.com";
+
+      allow create: if request.auth != null
+        && request.auth.token.email == "admin@framehouse.com";
+
+      allow update: if request.auth != null
+        && request.auth.token.email == "admin@framehouse.com";
+
+      allow delete: if request.auth != null
+        && request.auth.token.email == "admin@framehouse.com";
+
+      match /integrations/{integrationId} {
+
+        allow read: if request.auth != null
+          && request.auth.token.email == "admin@framehouse.com";
+
+        allow create: if request.auth != null
+          && request.auth.token.email == "admin@framehouse.com";
+
+        allow update: if request.auth != null
+          && request.auth.token.email == "admin@framehouse.com";
+
+        allow delete: if request.auth != null
+          && request.auth.token.email == "admin@framehouse.com";
+      }
     }
   }
 }
-

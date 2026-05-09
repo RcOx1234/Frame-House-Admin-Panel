@@ -19,6 +19,8 @@ export interface Project {
   type: ProjectType;
   category: FilterType;
   thumbnail: string;
+  /** Imagen grande para detalle / vista pública cuando el proyecto web usa modo separado */
+  previewImage?: string;
   previewVideo?: string;
   duration?: string;
   platform: string;
@@ -27,5 +29,9 @@ export interface Project {
   format: string;
   siteUrl?: string;
   featured?: boolean;
+  /** Si es false, oculto para invitados (solo admin lo ve en el panel) */
+  visible?: boolean;
+  /** Solo tipo web: usar miniatura distinta de la imagen de preview */
+  webSeparatePreview?: boolean;
 }
 
