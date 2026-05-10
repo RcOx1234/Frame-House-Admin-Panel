@@ -11,6 +11,15 @@ export type FilterType =
 
 export type GalleryViewMode = 'cards' | 'list';
 
+export type ProjectMediaKind = 'image' | 'video';
+
+export type ProjectMediaItem = {
+  id: string;
+  kind: ProjectMediaKind;
+  url: string;
+  label?: string;
+};
+
 export interface Project {
   idDoc?: string;
   id: string;
@@ -22,6 +31,12 @@ export interface Project {
   /** Imagen grande para detalle / vista pública cuando el proyecto web usa modo separado */
   previewImage?: string;
   previewVideo?: string;
+  /** Lista de assets para carrusel en el detalle (no incluye thumbnail a menos que se agregue explícitamente) */
+  mediaItems?: ProjectMediaItem[];
+  /** Asset inicial (recomendado) */
+  featuredMediaId?: string;
+  /** Compatibilidad: índice del asset inicial */
+  featuredMediaIndex?: number;
   duration?: string;
   platform: string;
   description: string;

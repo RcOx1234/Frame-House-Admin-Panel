@@ -1,6 +1,8 @@
 import { useEffect, useMemo } from 'react';
 import { useLockBodyScrollMobile } from '../hooks/useLockBodyScrollMobile';
 import type { Project } from '../types/project';
+import { ProjectMediaCarousel } from './ProjectMediaCarousel';
+import { getFeaturedCarouselIndex, getProjectCarouselItems, isProjectPreviewVideoAlreadyInCarousel } from '../utils/projectMedia';
 
 type Props = {
   open: boolean;
@@ -17,13 +19,12 @@ function isProbablyVideoUrl(url: string): boolean {
 export function ProjectDetailsModal({ open, project, useVideoPreview, onClose, onCopyId }: Props) {
   useLockBodyScrollMobile(open && Boolean(project));
 
-  const heroSrc = useMemo(() => {
-    if (!project) return '';
-    if (project.type === 'web' && project.webSeparatePreview && project.previewImage?.trim()) {
-      return project.previewImage.trim();
-    }
-    return project.thumbnail;
-  }, [project]);
+  const carouselItems = useMemo(() => (project ? getProjectCarouselItems(project) : []), [project]);
+  const initialCarouselIndex = useMemo(
+    () => (project ? getFeaturedCarouselIndex(project, carouselItems) : 0),
+    [project, carouselItems]
+  );
+  const showPreviewNote = Boolean(project?.type === 'web' && project.webSeparatePreview && project.previewImage?.trim());
 
   useEffect(() => {
     if (!open) return;
@@ -38,6 +39,7 @@ export function ProjectDetailsModal({ open, project, useVideoPreview, onClose, o
 
   const showEmbedVideo =
     useVideoPreview && project.previewVideo?.trim() && isProbablyVideoUrl(project.previewVideo.trim());
+  const previewVideoAlreadyInCarousel = isProjectPreviewVideoAlreadyInCarousel(project, carouselItems);
 
   return (
     <div
@@ -65,13 +67,8 @@ export function ProjectDetailsModal({ open, project, useVideoPreview, onClose, o
         <div className="max-h-[75vh] overflow-y-auto p-6">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="panel-card-muted overflow-hidden p-3">
-              <img
-                src={heroSrc}
-                alt={project.title}
-                className="h-52 w-full rounded-lg object-cover transition-opacity duration-300"
-                loading="lazy"
-              />
-              {project.type === 'web' && project.webSeparatePreview && project.previewImage?.trim() ? (
+              <ProjectMediaCarousel items={carouselItems} initialIndex={initialCarouselIndex} altFallback={project.title} />
+              {showPreviewNote ? (
                 <p className="mt-2 text-xs text-neutral-500 dark:text-neutral-500">Preview grande · miniatura puede diferir en la tarjeta</p>
               ) : null}
             </div>
@@ -104,7 +101,7 @@ export function ProjectDetailsModal({ open, project, useVideoPreview, onClose, o
             </div>
           </div>
 
-          {showEmbedVideo ? (
+          {showEmbedVideo && !previewVideoAlreadyInCarousel ? (
             <div className="mt-4 overflow-hidden rounded-xl border border-neutral-200 bg-black/90 dark:border-neutral-800">
               <video
                 src={project.previewVideo!.trim()}
@@ -114,7 +111,7 @@ export function ProjectDetailsModal({ open, project, useVideoPreview, onClose, o
                 preload="metadata"
               />
             </div>
-          ) : project.previewVideo?.trim() ? (
+          ) : project.previewVideo?.trim() && !previewVideoAlreadyInCarousel ? (
             <div className="panel-card-muted mt-4 p-4 text-sm text-neutral-700 dark:text-neutral-300">
               <span className="text-neutral-500 dark:text-neutral-500">Preview video:</span>{' '}
               <a href={project.previewVideo.trim()} target="_blank" rel="noreferrer" className="text-amber-700 dark:text-amber-400">

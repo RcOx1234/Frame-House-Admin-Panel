@@ -18,6 +18,8 @@ type Props = {
   allowUrl: boolean;
   accept: string;
   disabled?: boolean;
+  /** Menos padding; útil dentro de listas compactas */
+  dense?: boolean;
 };
 
 /** Mini spinner para estado de subida */
@@ -43,6 +45,7 @@ export function MediaAssetInput({
   allowUrl,
   accept,
   disabled,
+  dense,
 }: Props) {
   const initialSource = useMemo((): MediaSource => {
     if (defaultProvider === 'cloudinary') return 'cloudinary';
@@ -127,17 +130,21 @@ export function MediaAssetInput({
   const urlInvalid = source === 'url' && value.trim() !== '' && !isValidHttpUrl(value);
   const uploadDisabled = disabled || busy || (source !== 'url' && !integrationId);
 
+  const box = dense ? 'space-y-1.5 p-2' : 'space-y-2 p-3';
+
   return (
-    <div className="panel-card-muted space-y-2 p-3 transition hover:border-neutral-300 dark:hover:border-neutral-700">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="text-xs font-semibold uppercase tracking-wide text-neutral-600 dark:text-neutral-400">
+    <div
+      className={`panel-card-muted ${box} min-w-0 max-w-full overflow-hidden transition hover:border-neutral-300 dark:hover:border-neutral-700`}
+    >
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+        <span className="min-w-0 shrink text-xs font-semibold uppercase tracking-wide text-neutral-600 dark:text-neutral-400">
           {label}
         </span>
         <select
           value={source}
           disabled={disabled}
           onChange={(e) => setSource(e.target.value as MediaSource)}
-          className="panel-input py-1.5 text-xs"
+          className="panel-input max-w-full shrink-0 py-1.5 text-xs"
         >
           {allowUrl ? <option value="url">URL directa</option> : null}
           <option value="cloudinary" disabled={!cloudinaryAccounts.length}>
@@ -156,15 +163,15 @@ export function MediaAssetInput({
           disabled={disabled}
           onChange={(e) => onChange(e.target.value)}
           placeholder="https://..."
-          className="panel-input w-full"
+          className="panel-input w-full min-w-0 max-w-full"
         />
       ) : (
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
           <select
             value={integrationId}
             disabled={disabled || busy || !activeList.length}
             onChange={(e) => setIntegrationId(e.target.value)}
-            className="panel-input flex-1 py-2 text-xs"
+            className="panel-input min-w-0 flex-1 py-2 text-xs"
           >
             {activeList.map((i) => (
               <option key={i.id} value={i.id}>
@@ -197,8 +204,8 @@ export function MediaAssetInput({
       )}
 
       {value ? (
-        <p className="truncate text-xs text-neutral-500 dark:text-neutral-500" title={value}>
-          URL guardada: {value}
+        <p className="break-all text-xs text-neutral-500 dark:text-neutral-500" title={value}>
+          URL: {value}
         </p>
       ) : null}
 

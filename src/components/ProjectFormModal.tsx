@@ -5,6 +5,8 @@ import { generateProjectId } from '../utils/projectsId';
 import { MediaAssetInput } from './MediaAssetInput';
 import type { IntegrationDoc, PanelGeneralSettings } from '../types/settings';
 import { isValidHttpUrl } from '../services/mediaUpload';
+import { ProjectMediaEditor } from './ProjectMediaEditor';
+import { isLegacyProjectMedia, migrateLegacyProjectMedia } from '../utils/projectMedia';
 
 type Props = {
   open: boolean;
@@ -28,7 +30,7 @@ const CATEGORY_OPTIONS: FilterType[] = [
   'Otros',
 ];
 
-function defaultProject(projects: Project[], prefs: PanelGeneralSettings): Project {
+function defaultProject(projects: Project[]): Project {
   return {
     id: generateProjectId('video', projects),
     title: '',
@@ -38,6 +40,9 @@ function defaultProject(projects: Project[], prefs: PanelGeneralSettings): Proje
     thumbnail: '',
     previewImage: '',
     previewVideo: '',
+    mediaItems: [],
+    featuredMediaId: undefined,
+    featuredMediaIndex: undefined,
     duration: '',
     platform: '',
     description: '',
@@ -46,7 +51,7 @@ function defaultProject(projects: Project[], prefs: PanelGeneralSettings): Proje
     siteUrl: '',
     featured: false,
     visible: true,
-    webSeparatePreview: prefs.useSeparateGalleryImages,
+    webSeparatePreview: false,
   };
 }
 
@@ -61,7 +66,7 @@ export function ProjectFormModal({
   onClose,
   onSubmit,
 }: Props) {
-  const [model, setModel] = useState<Project>(() => defaultProject(projects, general));
+  const [model, setModel] = useState<Project>(() => defaultProject(projects));
   const [tagsText, setTagsText] = useState('');
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -76,16 +81,23 @@ export function ProjectFormModal({
         previewImage: initialProject.previewImage || '',
         visible: initialProject.visible !== false,
         webSeparatePreview: Boolean(initialProject.webSeparatePreview),
+        mediaItems:
+          initialProject.type === 'fotografia'
+            ? (initialProject.mediaItems || []).map((m) => ({ ...m, kind: 'image' as const }))
+            : initialProject.mediaItems || [],
+        featuredMediaId: initialProject.featuredMediaId,
+        featuredMediaIndex: initialProject.featuredMediaIndex,
       });
       setTagsText(initialProject.tags.join(', '));
     } else {
-      const next = defaultProject(projects, general);
+      const next = defaultProject(projects);
       setModel(next);
       setTagsText('');
     }
-  }, [open, mode, initialProject, projects, general]);
+  }, [open, mode, initialProject, projects]);
 
   const title = useMemo(() => (mode === 'create' ? 'Nuevo proyecto' : 'Editar proyecto'), [mode]);
+  const legacyMedia = useMemo(() => isLegacyProjectMedia(model), [model]);
 
   if (!open) return null;
 
@@ -112,6 +124,10 @@ export function ProjectFormModal({
       siteUrl: type === 'web' ? prev.siteUrl : '',
       previewImage: type === 'web' ? prev.previewImage : '',
       webSeparatePreview: type === 'web' ? prev.webSeparatePreview : false,
+      mediaItems:
+        type === 'fotografia'
+          ? (prev.mediaItems ?? []).map((m) => ({ ...m, kind: 'image' as const }))
+          : prev.mediaItems,
     }));
   }
 
@@ -122,34 +138,83 @@ export function ProjectFormModal({
       return;
     }
     if (!model.thumbnail.trim() || !isValidHttpUrl(model.thumbnail.trim())) {
-      setSubmitError('La miniatura debe ser una URL válida (https).');
+      setSubmitError('La miniatura debe ser una URL válida (https).'); //esto tambien
       return;
     }
-    if (model.type === 'web' && model.webSeparatePreview) {
-      const pi = model.previewImage?.trim();
-      if (pi && !isValidHttpUrl(pi)) {
-        setSubmitError('La imagen de preview debe ser una URL válida o estar vacía.');
+    if (legacyMedia) {
+      if (model.type === 'web' && model.webSeparatePreview) {
+        const pi = model.previewImage?.trim();
+        if (pi && !isValidHttpUrl(pi)) {
+          setSubmitError('La imagen de preview debe ser una URL válida o estar vacía.');
+          return;
+        }
+      }
+      if (model.previewVideo?.trim() && !isValidHttpUrl(model.previewVideo.trim())) {
+        setSubmitError('La URL del video no es válida.');
         return;
       }
     }
-    if (model.previewVideo?.trim() && !isValidHttpUrl(model.previewVideo.trim())) {
-      setSubmitError('La URL del video no es válida.');
+
+    const cleanedMediaItems = (model.mediaItems ?? [])
+      .map((x) => ({
+        ...x,
+        kind: model.type === 'fotografia' ? ('image' as const) : x.kind,
+        url: x.url?.trim() || '',
+        label: x.label?.trim() || undefined,
+      }))
+      .filter((x) => Boolean(x.url));
+
+    if (cleanedMediaItems.some((x) => !isValidHttpUrl(x.url))) {
+      setSubmitError('Hay elementos en galería con URL no válida (https).');
+      return;
+    }
+    if (
+      model.type !== 'fotografia' &&
+      cleanedMediaItems.some((x) => x.kind === 'video' && !/\.(mp4|webm|ogg|mov)(\?|$)/i.test(x.url))
+    ) {
+      setSubmitError('Los videos de galería deben ser URLs directas (mp4/webm/ogg/mov).');
+      return;
+    }
+    if (model.type === 'fotografia' && cleanedMediaItems.some((x) => x.kind === 'video')) {
+      setSubmitError('En fotografía la galería solo admite imágenes.');
+      return;
+    }
+
+    const featuredId = model.featuredMediaId?.trim() || '';
+    if (featuredId && !cleanedMediaItems.some((x) => x.id === featuredId)) {
+      setSubmitError('El elemento inicial seleccionado ya no existe en la galería.');
       return;
     }
 
     const payload: Project = {
       ...model,
+      mediaItems: cleanedMediaItems.length ? cleanedMediaItems : undefined,
+      featuredMediaId: featuredId || undefined,
+      featuredMediaIndex: featuredId ? cleanedMediaItems.findIndex((x) => x.id === featuredId) : undefined,
       tags: tagsText
         .split(',')
         .map((x) => x.trim())
         .filter(Boolean),
     };
-    if (payload.type !== 'web') {
-      delete payload.previewImage;
-      delete payload.webSeparatePreview;
-    } else if (!payload.webSeparatePreview) {
-      payload.previewImage = '';
+
+    if (mode === 'create' || !legacyMedia) {
+      payload.previewVideo = '';
+      if (payload.type === 'web') {
+        payload.webSeparatePreview = false;
+        payload.previewImage = '';
+      } else {
+        delete payload.previewImage;
+        delete payload.webSeparatePreview;
+      }
+    } else {
+      if (payload.type !== 'web') {
+        delete payload.previewImage;
+        delete payload.webSeparatePreview;
+      } else if (!payload.webSeparatePreview) {
+        payload.previewImage = '';
+      }
     }
+
     await onSubmit(payload);
   }
 
@@ -227,7 +292,7 @@ export function ProjectFormModal({
 
           <MediaAssetInput
             key={`thumb-${open}-${mode}`}
-            label="Miniatura (card)"
+            label="Miniatura (card)" //Creoo que esto tiene que ver con lo que le dijimos a cursor osea los nombres y eso
             value={model.thumbnail}
             onChange={(url) => update('thumbnail', url)}
             integrations={integrations}
@@ -236,60 +301,50 @@ export function ProjectFormModal({
             accept="image/*"
           />
 
+          {mode === 'edit' && legacyMedia ? (
+            <div className="rounded-lg border border-amber-500/35 bg-amber-950/25 px-3 py-2.5 text-xs text-neutral-200 dark:text-neutral-300">
+              <p>
+                Este proyecto usa el formato antiguo (vídeo preview o imagen grande web aparte). Puedes pasarlo a{' '}
+                <strong className="font-medium text-amber-200/90">miniatura + galería</strong>: se copian esos medios al
+                carrusel y se limpian los campos viejos. Si la galería queda vacía, el detalle sigue usando la miniatura
+                como antes.
+              </p>
+              <button
+                type="button"
+                onClick={() => setModel((m) => migrateLegacyProjectMedia(m))}
+                className="mt-2 rounded-lg border border-amber-500/40 bg-amber-600/90 px-3 py-1.5 text-xs font-semibold text-neutral-950 transition hover:bg-amber-500"
+              >
+                Actualizar a formato nuevo
+              </button>
+            </div>
+          ) : null}
+
+          <ProjectMediaEditor
+            projectType={model.type}
+            value={model.mediaItems || []}
+            featuredMediaId={model.featuredMediaId}
+            onChange={(next) => update('mediaItems', next)}
+            onChangeFeatured={(id) => update('featuredMediaId', id)}
+            integrations={integrations}
+            general={general}
+          />
+
           {model.type === 'web' ? (
-            <>
-              <label className="flex items-center gap-2 text-neutral-700 dark:text-neutral-300">
-                <input
-                  type="checkbox"
-                  checked={Boolean(model.webSeparatePreview)}
-                  onChange={(e) => {
-                    const checked = e.target.checked;
-                    update('webSeparatePreview', checked);
-                    if (!checked) update('previewImage', '');
-                  }}
-                />
-                Usar una imagen distinta para la vista grande / preview
-              </label>
-              {model.webSeparatePreview ? (
-                <MediaAssetInput
-                  key={`pv-${open}-${mode}`}
-                  label="Preview / página / detalle"
-                  value={model.previewImage || ''}
-                  onChange={(url) => update('previewImage', url)}
-                  integrations={integrations}
-                  defaultProvider={general.defaultMediaProvider}
-                  allowUrl={general.allowUrlUpload}
-                  accept="image/*"
-                />
-              ) : null}
-              <input
-                value={model.siteUrl || ''}
-                onChange={(e) => update('siteUrl', e.target.value)}
-                placeholder="URL del sitio"
-                className="panel-input w-full"
-              />
-            </>
+            <input
+              value={model.siteUrl || ''}
+              onChange={(e) => update('siteUrl', e.target.value)}
+              placeholder="URL del sitio"
+              className="panel-input w-full"
+            />
           ) : null}
 
           {model.type === 'video' ? (
-            <div className="space-y-3">
-              <MediaAssetInput
-                key={`pvvid-${open}-${mode}`}
-                label="Video preview"
-                value={model.previewVideo || ''}
-                onChange={(url) => update('previewVideo', url)}
-                integrations={integrations}
-                defaultProvider={general.defaultMediaProvider}
-                allowUrl={general.allowUrlUpload}
-                accept="video/*,image/*"
-              />
-              <input
-                value={model.duration || ''}
-                onChange={(e) => update('duration', e.target.value)}
-                placeholder="Duración (00:45)"
-                className="panel-input w-full sm:max-w-xs"
-              />
-            </div>
+            <input
+              value={model.duration || ''}
+              onChange={(e) => update('duration', e.target.value)}
+              placeholder="Duración (00:45)"
+              className="panel-input w-full sm:max-w-xs"
+            />
           ) : null}
 
           <textarea
