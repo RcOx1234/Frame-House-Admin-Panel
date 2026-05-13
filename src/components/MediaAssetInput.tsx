@@ -20,6 +20,8 @@ type Props = {
   disabled?: boolean;
   /** Menos padding; útil dentro de listas compactas */
   dense?: boolean;
+  /** Si es false, no se muestra la línea de texto con la URL guardada (el valor sigue editable en modo URL). */
+  showCurrentUrlFooter?: boolean;
 };
 
 /** Mini spinner para estado de subida */
@@ -46,6 +48,7 @@ export function MediaAssetInput({
   accept,
   disabled,
   dense,
+  showCurrentUrlFooter = true,
 }: Props) {
   const initialSource = useMemo((): MediaSource => {
     if (defaultProvider === 'cloudinary') return 'cloudinary';
@@ -203,7 +206,7 @@ export function MediaAssetInput({
         </div>
       )}
 
-      {value ? (
+      {value && showCurrentUrlFooter ? (
         <p className="break-all text-xs text-neutral-500 dark:text-neutral-500" title={value}>
           URL: {value}
         </p>
