@@ -18,6 +18,8 @@ export type ProjectMediaItem = {
   kind: ProjectMediaKind;
   url: string;
   label?: string;
+  /** Solo imágenes: `contain` muestra la imagen completa con fondo desenfocado. Por defecto `cover`. */
+  displayMode?: 'cover' | 'contain';
 };
 
 export interface Project {
@@ -50,6 +52,8 @@ export interface Project {
   instagramUrl?: string;
   /** Página de Facebook del proyecto (opcional) */
   facebookUrl?: string;
+  /** Perfil o publicación de TikTok del proyecto (opcional) */
+  tiktokUrl?: string;
   /** Solo tipo web: usar miniatura distinta de la imagen de preview */
   webSeparatePreview?: boolean;
 }

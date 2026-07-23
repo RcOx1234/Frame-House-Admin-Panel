@@ -124,6 +124,19 @@ export function ProjectDetailsModal({ open, project, useVideoPreview, onClose, o
                   </a>
                 </p>
               ) : null}
+              {project.tiktokUrl?.trim() ? (
+                <p className="text-neutral-800 dark:text-neutral-200">
+                  <span className="text-neutral-500 dark:text-neutral-500">TikTok:</span>{' '}
+                  <a
+                    href={project.tiktokUrl.trim()}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="break-all text-amber-700 dark:text-amber-400"
+                  >
+                    {project.tiktokUrl.trim()}
+                  </a>
+                </p>
+              ) : null}
             </div>
           </div>
 

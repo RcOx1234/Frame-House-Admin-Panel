@@ -58,6 +58,7 @@ function defaultProject(projects: Project[]): Project {
     webSeparatePreview: false,
     instagramUrl: '',
     facebookUrl: '',
+    tiktokUrl: '',
   };
 }
 
@@ -75,6 +76,7 @@ function normalizeProjectForForm(project: Project): Project {
     featuredMediaIndex: project.featuredMediaIndex,
     instagramUrl: project.instagramUrl || '',
     facebookUrl: project.facebookUrl || '',
+    tiktokUrl: project.tiktokUrl || '',
   };
 }
 
@@ -190,6 +192,7 @@ export function ProjectFormModal({
       // Redes del proyecto se conservan al cambiar el tipo.
       instagramUrl: prev.instagramUrl,
       facebookUrl: prev.facebookUrl,
+      tiktokUrl: prev.tiktokUrl,
     }));
   }
 
@@ -218,12 +221,16 @@ export function ProjectFormModal({
     }
 
     const cleanedMediaItems = (model.mediaItems ?? [])
-      .map((x) => ({
-        ...x,
-        kind: model.type === 'fotografia' ? ('image' as const) : x.kind,
-        url: x.url?.trim() || '',
-        label: x.label?.trim() || undefined,
-      }))
+      .map((x) => {
+        const kind = model.type === 'fotografia' ? ('image' as const) : x.kind;
+        return {
+          ...x,
+          kind,
+          url: x.url?.trim() || '',
+          label: x.label?.trim() || undefined,
+          displayMode: kind === 'image' && x.displayMode === 'contain' ? ('contain' as const) : undefined,
+        };
+      })
       .filter((x) => Boolean(x.url));
 
     if (cleanedMediaItems.some((x) => !isValidHttpUrl(x.url))) {
@@ -250,12 +257,17 @@ export function ProjectFormModal({
 
     const instagramUrl = model.instagramUrl?.trim() || '';
     const facebookUrl = model.facebookUrl?.trim() || '';
+    const tiktokUrl = model.tiktokUrl?.trim() || '';
     if (instagramUrl && !isValidHttpUrl(instagramUrl)) {
       setSubmitError('El perfil de Instagram debe ser una URL HTTP/HTTPS válida.');
       return;
     }
     if (facebookUrl && !isValidHttpUrl(facebookUrl)) {
       setSubmitError('La página de Facebook debe ser una URL HTTP/HTTPS válida.');
+      return;
+    }
+    if (tiktokUrl && !isValidHttpUrl(tiktokUrl)) {
+      setSubmitError('El enlace de TikTok debe ser una URL HTTP/HTTPS válida.');
       return;
     }
 
@@ -270,6 +282,7 @@ export function ProjectFormModal({
         .filter(Boolean),
       instagramUrl,
       facebookUrl,
+      tiktokUrl,
     };
 
     if (mode === 'create' || !legacyMedia) {
@@ -463,6 +476,12 @@ export function ProjectFormModal({
               value={model.facebookUrl || ''}
               onChange={(e) => update('facebookUrl', e.target.value)}
               placeholder="Página de Facebook"
+              className="panel-input w-full"
+            />
+            <input
+              value={model.tiktokUrl || ''}
+              onChange={(e) => update('tiktokUrl', e.target.value)}
+              placeholder="Perfil o publicación de TikTok"
               className="panel-input w-full"
             />
           </div>

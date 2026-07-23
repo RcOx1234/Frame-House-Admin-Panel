@@ -47,6 +47,21 @@ export function ProjectMediaCarousel({ items, initialIndex = 0, className = '', 
             playsInline
             preload="metadata"
           />
+        ) : current.displayMode === 'contain' ? (
+          <div className="relative h-52 w-full overflow-hidden">
+            <img
+              src={current.url}
+              alt=""
+              aria-hidden
+              className="absolute inset-0 h-full w-full scale-110 object-cover opacity-55 blur-3xl brightness-75"
+            />
+            <img
+              src={current.url}
+              alt={current.label || altFallback}
+              className="relative z-10 h-52 w-full object-contain transition-opacity duration-300"
+              loading="lazy"
+            />
+          </div>
         ) : (
           <img
             src={current.url}
