@@ -244,12 +244,20 @@ export async function touchSession(id: string): Promise<void> {
 
 export async function setSessionBlocked(id: string, blocked: boolean): Promise<void> {
   const db = getDb();
-  await updateDoc(doc(db, 'sessions', id), {
+  const payload: {
+    blocked: boolean;
+    lastSeen: ReturnType<typeof serverTimestamp>;
+    forceLogout?: boolean;
+    isActive?: boolean;
+  } = {
     blocked,
-    forceLogout: blocked ? false : undefined,
-    isActive: blocked ? false : undefined,
     lastSeen: serverTimestamp(),
-  });
+  };
+  if (blocked) {
+    payload.forceLogout = false;
+    payload.isActive = false;
+  }
+  await updateDoc(doc(db, 'sessions', id), payload);
 }
 
 export async function forceLogoutSession(id: string): Promise<void> {

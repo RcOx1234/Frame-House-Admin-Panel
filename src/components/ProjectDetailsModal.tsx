@@ -95,9 +95,35 @@ export function ProjectDetailsModal({ open, project, useVideoPreview, onClose, o
                 <span className="text-neutral-500 dark:text-neutral-500">Destacado:</span> {project.featured ? 'Sí' : 'No'}
               </p>
               <p className="text-neutral-800 dark:text-neutral-200">
-                <span className="text-neutral-500 dark:text-neutral-500">Visible invitados:</span>{' '}
-                {project.visible === false ? 'No' : 'Sí'}
+                <span className="text-neutral-500 dark:text-neutral-500">Estado web:</span>{' '}
+                {project.visible === false ? 'Oculto' : 'Publicado'}
               </p>
+              {project.instagramUrl?.trim() ? (
+                <p className="text-neutral-800 dark:text-neutral-200">
+                  <span className="text-neutral-500 dark:text-neutral-500">Instagram:</span>{' '}
+                  <a
+                    href={project.instagramUrl.trim()}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="break-all text-amber-700 dark:text-amber-400"
+                  >
+                    {project.instagramUrl.trim()}
+                  </a>
+                </p>
+              ) : null}
+              {project.facebookUrl?.trim() ? (
+                <p className="text-neutral-800 dark:text-neutral-200">
+                  <span className="text-neutral-500 dark:text-neutral-500">Facebook:</span>{' '}
+                  <a
+                    href={project.facebookUrl.trim()}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="break-all text-amber-700 dark:text-amber-400"
+                  >
+                    {project.facebookUrl.trim()}
+                  </a>
+                </p>
+              ) : null}
             </div>
           </div>
 

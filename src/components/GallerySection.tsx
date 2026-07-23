@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { FilterType, GalleryViewMode, Project } from '../types/project';
 import {
   createProject as createProjectFs,
@@ -9,6 +9,11 @@ import { useProjects } from '../hooks/useProjects';
 import { usePanelSettings } from '../hooks/usePanelSettings';
 import { ProjectDetailsModal } from './ProjectDetailsModal';
 import { ProjectFormModal } from './ProjectFormModal';
+import {
+  listProjectDrafts,
+  removeProjectDraft,
+  type ProjectDraft,
+} from '../services/projectDrafts';
 
 const FILTERS: FilterType[] = [
   'Todos',
@@ -27,6 +32,17 @@ type Props = {
   viewMode: GalleryViewMode;
 };
 
+function formatDraftDate(ts: number): string {
+  try {
+    return new Date(ts).toLocaleString('es-ES', {
+      dateStyle: 'short',
+      timeStyle: 'short',
+    });
+  } catch {
+    return String(ts);
+  }
+}
+
 export function GallerySection({ role, createSignal = 0, reloadSignal = 0, viewMode }: Props) {
   const { projects, reload, loading } = useProjects();
   const { general, integrations } = usePanelSettings(true);
@@ -38,8 +54,15 @@ export function GallerySection({ role, createSignal = 0, reloadSignal = 0, viewM
   const [editing, setEditing] = useState<Project | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [formSubmitting, setFormSubmitting] = useState(false);
+  const [activeDraftId, setActiveDraftId] = useState<string | null>(null);
+  const [activeDraftTags, setActiveDraftTags] = useState<string | null>(null);
+  const [drafts, setDrafts] = useState<ProjectDraft[]>(() => listProjectDrafts());
   const [feedback, setFeedback] = useState<string | null>(null);
   const rows = projects as Project[];
+
+  const refreshDrafts = useCallback(() => {
+    setDrafts(listProjectDrafts());
+  }, []);
 
   const visibleProjects = useMemo(() => {
     if (role === 'admin') return rows;
@@ -70,16 +93,49 @@ export function GallerySection({ role, createSignal = 0, reloadSignal = 0, viewM
     return list;
   }, [featuredOnly, filter, query, visibleProjects]);
 
+  function closeForm() {
+    setFormOpen(false);
+    setActiveDraftId(null);
+    setActiveDraftTags(null);
+    refreshDrafts();
+  }
+
   function openCreate() {
     setFormMode('create');
     setEditing(null);
+    setActiveDraftId(null);
+    setActiveDraftTags(null);
     setFormOpen(true);
   }
 
   function openEdit(project: Project) {
     setFormMode('edit');
     setEditing(project);
+    setActiveDraftId(null);
+    setActiveDraftTags(null);
     setFormOpen(true);
+  }
+
+  function continueDraft(draft: ProjectDraft) {
+    setFormMode(draft.mode);
+    setEditing({
+      ...draft.project,
+      idDoc: draft.idDoc ?? draft.project.idDoc,
+    });
+    setActiveDraftId(draft.id);
+    setActiveDraftTags(draft.tagsText);
+    setFormOpen(true);
+  }
+
+  function discardDraft(draft: ProjectDraft) {
+    const ok = window.confirm('¿Descartar este borrador? No se puede deshacer.');
+    if (!ok) return;
+    removeProjectDraft(draft.id);
+    if (activeDraftId === draft.id) {
+      closeForm();
+    } else {
+      refreshDrafts();
+    }
   }
 
   async function onSubmit(project: Project) {
@@ -90,14 +146,16 @@ export function GallerySection({ role, createSignal = 0, reloadSignal = 0, viewM
         delete payload.idDoc;
         await createProjectFs(payload);
       } else {
-        const idDoc = editing?.idDoc;
-        if (!idDoc) return;
+        const idDoc = editing?.idDoc || project.idDoc;
+        if (!idDoc) {
+          throw new Error('No se puede actualizar el proyecto: falta idDoc.');
+        }
         const payload = { ...project };
         delete payload.idDoc;
         await updateProjectFs(idDoc, payload);
       }
       await reload();
-      setFormOpen(false);
+      closeForm();
     } finally {
       setFormSubmitting(false);
     }
@@ -169,6 +227,48 @@ export function GallerySection({ role, createSignal = 0, reloadSignal = 0, viewM
         </label>
         {feedback ? <p className="mt-3 text-sm text-amber-400">{feedback}</p> : null}
       </div>
+
+      {role === 'admin' && drafts.length > 0 ? (
+        <div className="panel-card-muted space-y-2 p-3">
+          <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">
+            Borradores ({drafts.length})
+          </p>
+          <ul className="divide-y divide-neutral-200/80 dark:divide-neutral-800/80">
+            {drafts.map((d) => (
+              <li
+                key={d.id}
+                className="flex flex-wrap items-center justify-between gap-2 py-2 first:pt-0 last:pb-0"
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                    {d.project.title?.trim() || 'Proyecto sin título'}
+                  </p>
+                  <p className="text-xs text-neutral-500">
+                    {d.project.type} · {formatDraftDate(d.updatedAt)}
+                    {d.mode === 'edit' ? ' · edición' : ' · nuevo'}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => continueDraft(d)}
+                    className="panel-btn-secondary px-2.5 py-1 text-xs"
+                  >
+                    Continuar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => discardDraft(d)}
+                    className="rounded-lg border border-red-900/60 bg-red-950/40 px-2.5 py-1 text-xs text-red-300"
+                  >
+                    Descartar
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
       {loading ? (
         <div className="panel-card-muted px-4 py-10 text-center text-sm text-neutral-600 dark:text-neutral-400">
@@ -311,13 +411,15 @@ export function GallerySection({ role, createSignal = 0, reloadSignal = 0, viewM
         mode={formMode}
         projects={rows}
         initialProject={editing}
+        draftId={activeDraftId}
+        initialTagsText={activeDraftTags}
         general={general}
         integrations={integrations}
         submitting={formSubmitting}
-        onClose={() => setFormOpen(false)}
+        onClose={closeForm}
         onSubmit={onSubmit}
+        onDraftsChanged={refreshDrafts}
       />
     </section>
   );
 }
-

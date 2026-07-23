@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLockBodyScrollMobile } from '../hooks/useLockBodyScrollMobile';
 import type { FilterType, Project, ProjectType } from '../types/project';
 import { generateProjectId } from '../utils/projectsId';
@@ -7,17 +7,21 @@ import type { IntegrationDoc, PanelGeneralSettings } from '../types/settings';
 import { isValidHttpUrl } from '../services/mediaUpload';
 import { ProjectMediaEditor } from './ProjectMediaEditor';
 import { isLegacyProjectMedia, migrateLegacyProjectMedia } from '../utils/projectMedia';
+import { createDraftId, removeProjectDraft, upsertProjectDraft } from '../services/projectDrafts';
 
 type Props = {
   open: boolean;
   mode: 'create' | 'edit';
   projects: Project[];
   initialProject: Project | null;
+  draftId?: string | null;
+  initialTagsText?: string | null;
   general: PanelGeneralSettings;
   integrations: IntegrationDoc[];
   submitting?: boolean;
   onClose: () => void;
   onSubmit: (project: Project) => void | Promise<void>;
+  onDraftsChanged?: () => void;
 };
 
 const TYPE_OPTIONS: ProjectType[] = ['video', 'web', 'social', 'branding', 'fotografia', 'otros'];
@@ -52,7 +56,30 @@ function defaultProject(projects: Project[]): Project {
     featured: false,
     visible: true,
     webSeparatePreview: false,
+    instagramUrl: '',
+    facebookUrl: '',
   };
+}
+
+function normalizeProjectForForm(project: Project): Project {
+  return {
+    ...project,
+    previewImage: project.previewImage || '',
+    visible: project.visible !== false,
+    webSeparatePreview: Boolean(project.webSeparatePreview),
+    mediaItems:
+      project.type === 'fotografia'
+        ? (project.mediaItems || []).map((m) => ({ ...m, kind: 'image' as const }))
+        : project.mediaItems || [],
+    featuredMediaId: project.featuredMediaId,
+    featuredMediaIndex: project.featuredMediaIndex,
+    instagramUrl: project.instagramUrl || '',
+    facebookUrl: project.facebookUrl || '',
+  };
+}
+
+function snapshotKey(project: Project, tagsText: string): string {
+  return JSON.stringify({ project, tagsText });
 }
 
 export function ProjectFormModal({
@@ -60,41 +87,73 @@ export function ProjectFormModal({
   mode,
   projects,
   initialProject,
+  draftId = null,
+  initialTagsText = null,
   general,
   integrations,
   submitting = false,
   onClose,
   onSubmit,
+  onDraftsChanged,
 }: Props) {
   const [model, setModel] = useState<Project>(() => defaultProject(projects));
   const [tagsText, setTagsText] = useState('');
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const draftIdRef = useRef<string | null>(null);
+  const baselineRef = useRef<string>('');
+  const readyForDraftsRef = useRef(false);
 
   useLockBodyScrollMobile(open);
 
   useEffect(() => {
-    if (!open) return;
-    setSubmitError(null);
-    if (mode === 'edit' && initialProject) {
-      setModel({
-        ...initialProject,
-        previewImage: initialProject.previewImage || '',
-        visible: initialProject.visible !== false,
-        webSeparatePreview: Boolean(initialProject.webSeparatePreview),
-        mediaItems:
-          initialProject.type === 'fotografia'
-            ? (initialProject.mediaItems || []).map((m) => ({ ...m, kind: 'image' as const }))
-            : initialProject.mediaItems || [],
-        featuredMediaId: initialProject.featuredMediaId,
-        featuredMediaIndex: initialProject.featuredMediaIndex,
-      });
-      setTagsText(initialProject.tags.join(', '));
-    } else {
-      const next = defaultProject(projects);
-      setModel(next);
-      setTagsText('');
+    if (!open) {
+      readyForDraftsRef.current = false;
+      return;
     }
-  }, [open, mode, initialProject, projects]);
+    setSubmitError(null);
+    readyForDraftsRef.current = false;
+    draftIdRef.current = draftId;
+
+    let next: Project;
+    let nextTags: string;
+    if (initialProject) {
+      next = normalizeProjectForForm(initialProject);
+      nextTags = initialTagsText ?? initialProject.tags.join(', ');
+    } else {
+      next = defaultProject(projects);
+      nextTags = '';
+    }
+    setModel(next);
+    setTagsText(nextTags);
+    baselineRef.current = snapshotKey(next, nextTags);
+    // Permitir autoguardado tras el primer paint del estado inicial.
+    window.setTimeout(() => {
+      readyForDraftsRef.current = true;
+    }, 0);
+  }, [open, mode, initialProject, projects, draftId, initialTagsText]);
+
+  useEffect(() => {
+    if (!open || !readyForDraftsRef.current) return;
+    const key = snapshotKey(model, tagsText);
+    if (key === baselineRef.current) return;
+
+    if (!draftIdRef.current) {
+      draftIdRef.current = createDraftId();
+    }
+
+    const idDoc =
+      mode === 'edit' ? model.idDoc || initialProject?.idDoc || undefined : undefined;
+
+    upsertProjectDraft({
+      id: draftIdRef.current,
+      mode,
+      idDoc,
+      project: { ...model, idDoc },
+      tagsText,
+      updatedAt: Date.now(),
+    });
+    onDraftsChanged?.();
+  }, [open, model, tagsText, mode, initialProject?.idDoc, onDraftsChanged]);
 
   const title = useMemo(() => (mode === 'create' ? 'Nuevo proyecto' : 'Editar proyecto'), [mode]);
   const legacyMedia = useMemo(() => isLegacyProjectMedia(model), [model]);
@@ -128,6 +187,9 @@ export function ProjectFormModal({
         type === 'fotografia'
           ? (prev.mediaItems ?? []).map((m) => ({ ...m, kind: 'image' as const }))
           : prev.mediaItems,
+      // Redes del proyecto se conservan al cambiar el tipo.
+      instagramUrl: prev.instagramUrl,
+      facebookUrl: prev.facebookUrl,
     }));
   }
 
@@ -138,7 +200,7 @@ export function ProjectFormModal({
       return;
     }
     if (!model.thumbnail.trim() || !isValidHttpUrl(model.thumbnail.trim())) {
-      setSubmitError('La miniatura debe ser una URL válida (https).'); //esto tambien
+      setSubmitError('La miniatura debe ser una URL válida (https).');
       return;
     }
     if (legacyMedia) {
@@ -186,6 +248,17 @@ export function ProjectFormModal({
       return;
     }
 
+    const instagramUrl = model.instagramUrl?.trim() || '';
+    const facebookUrl = model.facebookUrl?.trim() || '';
+    if (instagramUrl && !isValidHttpUrl(instagramUrl)) {
+      setSubmitError('El perfil de Instagram debe ser una URL HTTP/HTTPS válida.');
+      return;
+    }
+    if (facebookUrl && !isValidHttpUrl(facebookUrl)) {
+      setSubmitError('La página de Facebook debe ser una URL HTTP/HTTPS válida.');
+      return;
+    }
+
     const payload: Project = {
       ...model,
       mediaItems: cleanedMediaItems.length ? cleanedMediaItems : undefined,
@@ -195,6 +268,8 @@ export function ProjectFormModal({
         .split(',')
         .map((x) => x.trim())
         .filter(Boolean),
+      instagramUrl,
+      facebookUrl,
     };
 
     if (mode === 'create' || !legacyMedia) {
@@ -215,7 +290,21 @@ export function ProjectFormModal({
       }
     }
 
-    await onSubmit(payload);
+    try {
+      await onSubmit(payload);
+    } catch (err) {
+      console.error(err);
+      setSubmitError(
+        'No se pudo guardar el proyecto. Revisa tu conexión o permisos e inténtalo nuevamente.'
+      );
+      return;
+    }
+
+    if (draftIdRef.current) {
+      removeProjectDraft(draftIdRef.current);
+      draftIdRef.current = null;
+      onDraftsChanged?.();
+    }
   }
 
   return (
@@ -292,7 +381,7 @@ export function ProjectFormModal({
 
           <MediaAssetInput
             key={`thumb-${open}-${mode}`}
-            label="Miniatura (card)" //Creoo que esto tiene que ver con lo que le dijimos a cursor osea los nombres y eso
+            label="Miniatura (card)"
             value={model.thumbnail}
             onChange={(url) => update('thumbnail', url)}
             integrations={integrations}
@@ -362,6 +451,22 @@ export function ProjectFormModal({
             className="panel-input w-full"
           />
 
+          <div className="space-y-2 rounded-lg border border-neutral-200 p-3 dark:border-neutral-800">
+            <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">Redes del proyecto</p>
+            <input
+              value={model.instagramUrl || ''}
+              onChange={(e) => update('instagramUrl', e.target.value)}
+              placeholder="Perfil de Instagram"
+              className="panel-input w-full"
+            />
+            <input
+              value={model.facebookUrl || ''}
+              onChange={(e) => update('facebookUrl', e.target.value)}
+              placeholder="Página de Facebook"
+              className="panel-input w-full"
+            />
+          </div>
+
           <div className="flex flex-wrap gap-4">
             <label className="inline-flex items-center gap-2 text-neutral-700 dark:text-neutral-300">
               <input
@@ -377,7 +482,7 @@ export function ProjectFormModal({
                 checked={model.visible !== false}
                 onChange={(e) => update('visible', e.target.checked)}
               />
-              Visible para invitados
+              Publicado en la web
             </label>
           </div>
 
