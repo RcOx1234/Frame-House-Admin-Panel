@@ -79,7 +79,15 @@ function MediaMiniThumb({
   );
 }
 
-function MediaEditPreview({ kind, url }: { kind: ProjectMediaKind; url: string }) {
+function MediaEditPreview({
+  kind,
+  url,
+  displayMode,
+}: {
+  kind: ProjectMediaKind;
+  url: string;
+  displayMode?: 'cover' | 'contain';
+}) {
   const trimmed = url.trim();
   if (!trimmed) {
     return (
@@ -89,6 +97,24 @@ function MediaEditPreview({ kind, url }: { kind: ProjectMediaKind; url: string }
     );
   }
   if (kind === 'image') {
+    if (displayMode === 'contain') {
+      return (
+        <div className="relative flex max-h-72 w-full justify-center overflow-hidden rounded-xl border border-neutral-200 dark:border-neutral-800">
+          <img
+            src={trimmed}
+            alt=""
+            aria-hidden
+            className="absolute inset-0 h-full w-full scale-110 object-cover opacity-55 blur-3xl brightness-75"
+          />
+          <img
+            src={trimmed}
+            alt="Vista previa"
+            className="relative z-10 max-h-72 w-full object-contain"
+            loading="lazy"
+          />
+        </div>
+      );
+    }
     return (
       <div className="flex max-h-72 w-full justify-center overflow-hidden rounded-xl border border-neutral-200 bg-neutral-100/60 dark:border-neutral-800 dark:bg-neutral-900/40">
         <img src={trimmed} alt="Vista previa" className="max-h-72 w-full object-contain" loading="lazy" />
@@ -160,7 +186,16 @@ export function ProjectMediaEditor({
 
   function setKind(id: string, kind: ProjectMediaKind) {
     if (!allowVideo && kind === 'video') return;
-    onChange(list.map((x) => (x.id === id ? { ...x, kind } : x)));
+    onChange(
+      list.map((x) => {
+        if (x.id !== id) return x;
+        if (kind === 'video') {
+          const { displayMode: _removed, ...rest } = x;
+          return { ...rest, kind };
+        }
+        return { ...x, kind };
+      })
+    );
   }
 
   function removeItem(id: string) {
@@ -361,7 +396,9 @@ export function ProjectMediaEditor({
                     {itemTitle(item, idx)}
                   </p>
                   <p className="text-[10px] text-neutral-500 dark:text-neutral-500">
-                    {allowVideo ? (item.kind === 'video' ? 'Vídeo' : 'Imagen') : 'Imagen'} · {idx + 1}
+                    {item.kind === 'image' && item.displayMode === 'contain'
+                      ? 'Imagen · Completa'
+                      : `${allowVideo ? (item.kind === 'video' ? 'Vídeo' : 'Imagen') : 'Imagen'} · ${idx + 1}`}
                   </p>
                 </div>
 
@@ -436,7 +473,11 @@ export function ProjectMediaEditor({
             </div>
 
             <div className="flex-1 space-y-4 overflow-y-auto p-4 text-sm">
-              <MediaEditPreview kind={editingItem.kind} url={editingItem.url} />
+              <MediaEditPreview
+                kind={editingItem.kind}
+                url={editingItem.url}
+                displayMode={editingItem.displayMode}
+              />
 
               <div className="space-y-2">
                 <label className="block text-[11px] font-medium uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
@@ -464,6 +505,28 @@ export function ProjectMediaEditor({
                     <option value="image">Imagen</option>
                     <option value="video">Vídeo</option>
                   </select>
+                </div>
+              ) : null}
+
+              {editingItem.kind === 'image' ? (
+                <div className="space-y-1">
+                  <label className="inline-flex items-start gap-2 text-sm text-neutral-700 dark:text-neutral-300">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5"
+                      checked={editingItem.displayMode === 'contain'}
+                      onChange={(e) =>
+                        updateItem(editingItem.id, {
+                          displayMode: e.target.checked ? 'contain' : undefined,
+                        })
+                      }
+                    />
+                    <span>Mostrar imagen completa (sin recortar)</span>
+                  </label>
+                  <p className="pl-6 text-[11px] leading-snug text-neutral-500 dark:text-neutral-500">
+                    Ideal para flyers, afiches y diseños verticales. El espacio sobrante se rellenará con un fondo
+                    desenfocado.
+                  </p>
                 </div>
               ) : null}
 
