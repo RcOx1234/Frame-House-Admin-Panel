@@ -147,7 +147,9 @@ export function GallerySection({ role, createSignal = 0, reloadSignal = 0, viewM
         await createProjectFs(payload);
       } else {
         const idDoc = editing?.idDoc || project.idDoc;
-        if (!idDoc) return;
+        if (!idDoc) {
+          throw new Error('No se puede actualizar el proyecto: falta idDoc.');
+        }
         const payload = { ...project };
         delete payload.idDoc;
         await updateProjectFs(idDoc, payload);

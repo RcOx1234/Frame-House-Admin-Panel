@@ -268,8 +268,8 @@ export function ProjectFormModal({
         .split(',')
         .map((x) => x.trim())
         .filter(Boolean),
-      instagramUrl: instagramUrl || undefined,
-      facebookUrl: facebookUrl || undefined,
+      instagramUrl,
+      facebookUrl,
     };
 
     if (mode === 'create' || !legacyMedia) {
@@ -290,7 +290,16 @@ export function ProjectFormModal({
       }
     }
 
-    await onSubmit(payload);
+    try {
+      await onSubmit(payload);
+    } catch (err) {
+      console.error(err);
+      setSubmitError(
+        'No se pudo guardar el proyecto. Revisa tu conexión o permisos e inténtalo nuevamente.'
+      );
+      return;
+    }
+
     if (draftIdRef.current) {
       removeProjectDraft(draftIdRef.current);
       draftIdRef.current = null;
