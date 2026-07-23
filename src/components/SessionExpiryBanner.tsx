@@ -1,25 +1,27 @@
 type Props = {
-  message: string;
-  onDismiss: () => void;
+  secondsLeft: number;
+  onContinue: () => void;
 };
 
-export function SessionExpiryBanner({ message, onDismiss }: Props) {
+export function SessionExpiryBanner({ secondsLeft, onContinue }: Props) {
+  const safeSeconds = Math.max(0, Math.min(60, Math.ceil(secondsLeft)));
+
   return (
-    <div className="flex items-start justify-between gap-4 rounded-xl border border-amber-500/25 bg-amber-950/30 px-4 py-3">
+    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-amber-500/30 bg-amber-950/95 px-4 py-3 shadow-lg backdrop-blur-sm">
       <div>
-        <p className="text-sm font-medium text-amber-200">Aviso de sesión</p>
-        <p className="mt-0.5 text-sm text-amber-200/80">{message}</p>
+        <p className="text-sm font-medium text-amber-100">Tu sesión está por caducar</p>
+        <p className="mt-0.5 text-sm text-amber-200/85">
+          Caduca en <span className="font-semibold tabular-nums text-amber-50">{safeSeconds}</span> segundo
+          {safeSeconds === 1 ? '' : 's'}. Continúa para renovar 10 minutos más.
+        </p>
       </div>
       <button
         type="button"
-        onClick={onDismiss}
-        className="rounded-lg border border-amber-500/20 px-2.5 py-1 text-sm font-medium text-amber-200/90 transition hover:border-amber-500/35 hover:bg-amber-950/30"
-        aria-label="Cerrar aviso de expiración"
-        title="Cerrar"
+        onClick={onContinue}
+        className="rounded-lg bg-amber-500 px-3.5 py-2 text-sm font-semibold text-neutral-950 transition hover:bg-amber-400"
       >
-        ×
+        Continuar sesión
       </button>
     </div>
   );
 }
-

@@ -17,7 +17,7 @@ import { ConfiguracionesSection } from '../components/ConfiguracionesSection';
 type Props = {
   role: PanelRole;
   onLogout: () => void;
-  sessionExpiryWarning?: { message: string; onDismiss: () => void } | null;
+  sessionExpiryWarning?: { secondsLeft: number; onContinue: () => void } | null;
   sessionContext: { uid: string; deviceId: string; sessionId: string | null };
 };
 
@@ -453,13 +453,18 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContex
         </div>
       </header>
 
+      {sessionExpiryWarning ? (
+        <div className="fixed inset-x-0 top-0 z-[200]">
+          <SessionExpiryBanner
+            secondsLeft={sessionExpiryWarning.secondsLeft}
+            onContinue={sessionExpiryWarning.onContinue}
+          />
+        </div>
+      ) : null}
+
       <main className="mx-auto max-w-6xl space-y-6 px-4 pt-6">
         {section === 'registros' ? (
           <>
-            {sessionExpiryWarning ? (
-              <SessionExpiryBanner message={sessionExpiryWarning.message} onDismiss={sessionExpiryWarning.onDismiss} />
-            ) : null}
-
             {!focused ? (
               <div className="grid gap-3 sm:grid-cols-3">
                 <StatsCard title="Registros visibles" value={filtered.length} hint="Tras búsqueda y filtro" />

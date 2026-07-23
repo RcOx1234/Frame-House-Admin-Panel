@@ -26,30 +26,78 @@ import { subscribeGeneralSettings } from './services/settingsFirestore';
 const ADMIN_EMAIL = ADMIN_PANEL_EMAIL;
 const GUEST_EMAIL = 'invitado@framehouse.com';
 const SESSION_TTL_MS = 10 * 60 * 1000; // 10 minutos
+const SESSION_WARN_MS = 60_000;
 const LS_LOGIN_AT_KEY = 'fh_login_at';
 const LS_LOGIN_FLOW_KEY = 'fh_login_flow';
 const LS_LAST_ACTIVE_AT_KEY = 'fh_last_active_at';
+const ACTIVITY_THROTTLE_MS = 1000;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+async function waitForLoginFlowToFinish(timeoutMs = 15_000): Promise<void> {
+  const started = Date.now();
+  while (localStorage.getItem(LS_LOGIN_FLOW_KEY) === '1') {
+    if (Date.now() - started > timeoutMs) break;
+    await sleep(50);
+  }
+}
+
+function readLastActiveAt(): number {
+  return Number(localStorage.getItem(LS_LAST_ACTIVE_AT_KEY) || 0);
+}
+
+function bumpLastActiveAt(): void {
+  localStorage.setItem(LS_LAST_ACTIVE_AT_KEY, String(Date.now()));
+}
 
 export default function App() {
   const { setTheme } = useTheme();
   const [user, setUser] = useState<User | null>(null);
   const [checking, setChecking] = useState(true);
+  const [sessionGateReady, setSessionGateReady] = useState(false);
   const [sessionExpired, setSessionExpired] = useState(false);
   const [showExpiryWarning, setShowExpiryWarning] = useState(false);
-  const warningDismissedRef = useRef(false);
+  const [expirySecondsLeft, setExpirySecondsLeft] = useState(60);
   const [accessDenied, setAccessDenied] = useState<null | 'blocked' | 'remote_logout'>(null);
   const [remoteLogoutSessionId, setRemoteLogoutSessionId] = useState<string | null>(null);
   const [currentSession, setCurrentSession] = useState<SessionDoc | null>(null);
+  const expiringRef = useRef(false);
 
   async function expireSessionNow(sessionId?: string | null) {
-    localStorage.removeItem(LS_LOGIN_AT_KEY);
-    localStorage.removeItem(LS_LAST_ACTIVE_AT_KEY);
-    setShowExpiryWarning(false);
-    setSessionExpired(true);
-    if (sessionId) {
-      await markSessionInactive(sessionId);
+    if (expiringRef.current) return;
+    expiringRef.current = true;
+    try {
+      if (sessionId) {
+        await markSessionInactive(sessionId);
+      }
+      localStorage.removeItem(LS_LOGIN_AT_KEY);
+      localStorage.removeItem(LS_LAST_ACTIVE_AT_KEY);
+      setShowExpiryWarning(false);
+      setExpirySecondsLeft(60);
+      setSessionExpired(true);
+      await signOut(getAuthClient());
+    } finally {
+      expiringRef.current = false;
     }
-    await signOut(getAuthClient());
+  }
+
+  function clearLoginAlerts() {
+    setSessionExpired(false);
+    setAccessDenied(null);
+    setRemoteLogoutSessionId(null);
+    setShowExpiryWarning(false);
+    setExpirySecondsLeft(60);
+  }
+
+  function continueSession() {
+    bumpLastActiveAt();
+    setShowExpiryWarning(false);
+    setExpirySecondsLeft(60);
+    if (currentSession?.id) {
+      void touchSession(currentSession.id);
+    }
   }
 
   useEffect(() => {
@@ -63,62 +111,59 @@ export default function App() {
   useEffect(() => {
     if (!user) {
       setCurrentSession(null);
+      setSessionGateReady(true);
       return;
     }
 
     let unsub: (() => void) | null = null;
     let cancelled = false;
+    setSessionGateReady(false);
 
     const run = async () => {
       const deviceId = getDeviceId();
       const role: PanelRole = user.email === ADMIN_EMAIL ? 'admin' : 'guest';
       const sid = sessionIdFor(user.uid, deviceId);
-      const loginAt = Number(localStorage.getItem(LS_LOGIN_AT_KEY) || 0);
-      const lastActiveAt = Number(localStorage.getItem(LS_LAST_ACTIVE_AT_KEY) || 0);
-      const baseTs = Math.max(loginAt, lastActiveAt);
 
-      if (baseTs && Date.now() - baseTs > SESSION_TTL_MS) {
+      // Si hay login en curso, espera a que termine upsertSessionOnLogin antes de forceLogout.
+      if (localStorage.getItem(LS_LOGIN_FLOW_KEY) === '1') {
+        await waitForLoginFlowToFinish();
+      }
+      if (cancelled) return;
+
+      const lastActiveAt = readLastActiveAt();
+      if (lastActiveAt && Date.now() - lastActiveAt > SESSION_TTL_MS) {
         await expireSessionNow(sid);
+        if (!cancelled) setSessionGateReady(true);
         return;
       }
 
-      // Verificación inmediata de bloqueo antes de continuar.
       const existing = await getSessionById(sid);
+      if (cancelled) return;
+
       if (existing?.blocked) {
         setAccessDenied('blocked');
         await signOut(getAuthClient());
+        if (!cancelled) setSessionGateReady(true);
         return;
       }
 
       if (existing?.forceLogout && !existing.blocked) {
-        // Evita falso positivo en la primera restauración tras login.
-        if (localStorage.getItem(LS_LOGIN_FLOW_KEY) === '1') {
-          await new Promise((resolve) => window.setTimeout(resolve, 1200));
-          const refreshed = await getSessionById(sid);
-          if (!refreshed?.forceLogout) {
-            // Ya se limpió el cierre remoto por el login actual.
-          } else {
-            setRemoteLogoutSessionId(sid);
-            setAccessDenied('remote_logout');
-            await signOut(getAuthClient());
-            return;
-          }
-        } else {
         setRemoteLogoutSessionId(sid);
         setAccessDenied('remote_logout');
         await signOut(getAuthClient());
+        if (!cancelled) setSessionGateReady(true);
         return;
-        }
       }
 
-      // Sesión restaurada por Auth persistente: no borrar forceLogout aquí.
       const sessionId = await upsertSessionOnAuthRestore({
         uid: user.uid,
         email: user.email || '',
         role,
         deviceId,
       });
-      localStorage.setItem(LS_LAST_ACTIVE_AT_KEY, String(Date.now()));
+      if (!readLastActiveAt()) {
+        bumpLastActiveAt();
+      }
 
       if (cancelled) return;
       const ref = doc(getDb(), 'sessions', sessionId);
@@ -162,6 +207,8 @@ export default function App() {
           await signOut(getAuthClient());
         }
       });
+
+      if (!cancelled) setSessionGateReady(true);
     };
 
     void run();
@@ -185,7 +232,6 @@ export default function App() {
     if (accessDenied) return;
 
     const id = window.setInterval(() => {
-      localStorage.setItem(LS_LAST_ACTIVE_AT_KEY, String(Date.now()));
       void touchSession(currentSession.id);
     }, 60_000);
     return () => window.clearInterval(id);
@@ -198,8 +244,6 @@ export default function App() {
     const onVisibility = () => {
       if (document.visibilityState === 'hidden') {
         void markSessionInactive(currentSession.id);
-      } else {
-        localStorage.setItem(LS_LAST_ACTIVE_AT_KEY, String(Date.now()));
       }
     };
 
@@ -215,60 +259,68 @@ export default function App() {
     };
   }, [currentSession?.id, user]);
 
+  // Actividad real reinicia el reloj de inactividad (throttled).
   useEffect(() => {
     if (!user) return;
+    if (accessDenied) return;
+    if (sessionExpired) return;
 
-    function isExpired(): boolean {
-      const loginAt = Number(localStorage.getItem(LS_LOGIN_AT_KEY) || 0);
-      if (!loginAt) return false;
-      return Date.now() - loginAt > SESSION_TTL_MS;
-    }
+    let lastWrite = 0;
+    const onActivity = () => {
+      const now = Date.now();
+      if (now - lastWrite < ACTIVITY_THROTTLE_MS) return;
+      lastWrite = now;
+      bumpLastActiveAt();
+    };
 
-    const tick = async () => {
-      if (!user) return;
-      if (isExpired()) {
-        await expireSessionNow(currentSession?.id);
+    const opts: AddEventListenerOptions = { passive: true };
+    window.addEventListener('pointerdown', onActivity, opts);
+    window.addEventListener('keydown', onActivity);
+    window.addEventListener('input', onActivity, opts);
+    window.addEventListener('touchstart', onActivity, opts);
+    window.addEventListener('scroll', onActivity, opts);
+
+    return () => {
+      window.removeEventListener('pointerdown', onActivity);
+      window.removeEventListener('keydown', onActivity);
+      window.removeEventListener('input', onActivity);
+      window.removeEventListener('touchstart', onActivity);
+      window.removeEventListener('scroll', onActivity);
+    };
+  }, [accessDenied, sessionExpired, user]);
+
+  // Único reloj: aviso a 60s e expiración real vía expireSessionNow.
+  useEffect(() => {
+    if (!user) return;
+    if (accessDenied) return;
+    if (sessionExpired) return;
+    if (!sessionGateReady) return;
+
+    const tick = () => {
+      const lastActiveAt = readLastActiveAt();
+      if (!lastActiveAt) return;
+
+      const elapsed = Date.now() - lastActiveAt;
+      const remaining = SESSION_TTL_MS - elapsed;
+
+      if (remaining <= 0) {
+        void expireSessionNow(currentSession?.id);
+        return;
+      }
+
+      if (remaining <= SESSION_WARN_MS) {
+        setShowExpiryWarning(true);
+        setExpirySecondsLeft(Math.max(0, Math.ceil(remaining / 1000)));
+      } else {
+        setShowExpiryWarning(false);
+        setExpirySecondsLeft(60);
       }
     };
 
     void tick();
-    const id = window.setInterval(() => void tick(), 15_000);
+    const id = window.setInterval(tick, 250);
     return () => window.clearInterval(id);
-  }, [currentSession?.id, user]);
-
-  useEffect(() => {
-    if (!user) return;
-    if (sessionExpired) return;
-
-    const loginAt = Number(localStorage.getItem(LS_LOGIN_AT_KEY) || 0);
-    if (!loginAt) return;
-
-    const warnAt = loginAt + SESSION_TTL_MS - 60_000;
-    const expireAt = loginAt + SESSION_TTL_MS;
-    const now = Date.now();
-
-    const warningDelay = warnAt - now;
-    const expireDelay = expireAt - now;
-
-    const warningId =
-      warningDelay <= 0
-        ? window.setTimeout(() => {
-            if (!warningDismissedRef.current) setShowExpiryWarning(true);
-          }, 0)
-        : window.setTimeout(() => {
-            if (!warningDismissedRef.current) setShowExpiryWarning(true);
-          }, warningDelay);
-
-    const expireId =
-      expireDelay <= 0
-        ? window.setTimeout(() => setSessionExpired(true), 0)
-        : window.setTimeout(() => setSessionExpired(true), expireDelay);
-
-    return () => {
-      window.clearTimeout(warningId);
-      window.clearTimeout(expireId);
-    };
-  }, [sessionExpired, user]);
+  }, [accessDenied, currentSession?.id, sessionExpired, sessionGateReady, user]);
 
   const role: PanelRole | null = useMemo(() => {
     if (!user?.email) return null;
@@ -281,7 +333,7 @@ export default function App() {
     localStorage.removeItem(LS_LOGIN_AT_KEY);
     localStorage.removeItem(LS_LAST_ACTIVE_AT_KEY);
     setShowExpiryWarning(false);
-    warningDismissedRef.current = false;
+    setExpirySecondsLeft(60);
     setSessionExpired(false);
     setAccessDenied(null);
     setRemoteLogoutSessionId(null);
@@ -291,7 +343,7 @@ export default function App() {
     await signOut(getAuthClient());
   }
 
-  if (checking) {
+  if (checking || (user && !sessionGateReady)) {
     return (
       <div className="panel-shell flex items-center justify-center px-4 py-12">
         <div className="panel-card-muted px-5 py-4 text-sm text-neutral-600 dark:text-neutral-400">
@@ -305,9 +357,7 @@ export default function App() {
     return (
       <SessionExpiredScreen
         onBackToLogin={() => {
-          setSessionExpired(false);
-          setShowExpiryWarning(false);
-          warningDismissedRef.current = false;
+          clearLoginAlerts();
         }}
       />
     );
@@ -317,11 +367,7 @@ export default function App() {
     return (
       <BlockedScreen
         onBackToLogin={() => {
-          setAccessDenied(null);
-          setRemoteLogoutSessionId(null);
-          setSessionExpired(false);
-          setShowExpiryWarning(false);
-          warningDismissedRef.current = false;
+          clearLoginAlerts();
         }}
       />
     );
@@ -334,11 +380,7 @@ export default function App() {
           if (remoteLogoutSessionId) {
             void acknowledgeRemoteLogout(remoteLogoutSessionId);
           }
-          setAccessDenied(null);
-          setRemoteLogoutSessionId(null);
-          setSessionExpired(false);
-          setShowExpiryWarning(false);
-          warningDismissedRef.current = false;
+          clearLoginAlerts();
         }}
       />
     );
@@ -347,7 +389,7 @@ export default function App() {
   if (!user || !role) {
     return (
       <div className="panel-shell flex items-center justify-center px-4 py-12 max-md:h-[100dvh] max-md:min-h-0 max-md:overflow-hidden max-md:py-6">
-        <LoginCard onSuccess={() => {}} />
+        <LoginCard onSuccess={clearLoginAlerts} />
       </div>
     );
   }
@@ -364,11 +406,8 @@ export default function App() {
       sessionExpiryWarning={
         showExpiryWarning
           ? {
-              message: 'Tu sesión caducará en 1 minuto.',
-              onDismiss: () => {
-                warningDismissedRef.current = true;
-                setShowExpiryWarning(false);
-              },
+              secondsLeft: expirySecondsLeft,
+              onContinue: continueSession,
             }
           : null
       }

@@ -1,4 +1,5 @@
 import { useMemo, useState, type FormEvent } from 'react';
+import { FirebaseError } from 'firebase/app';
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { getAuthClient } from '../firebase';
 import { getDeviceId } from '../utils/deviceId';
@@ -36,6 +37,21 @@ export function LoginCard({ onSuccess }: Props) {
     return Number(localStorage.getItem(LS_BLOCK_UNTIL_KEY) || 0);
   }
 
+  function registerFailedAttempt() {
+    const attempts = getAttempts();
+    const newAttempts = attempts + 1;
+    localStorage.setItem(LS_ATTEMPTS_KEY, String(newAttempts));
+
+    if (newAttempts >= MAX_ATTEMPTS) {
+      const blockUntil = Date.now() + BLOCK_TIME;
+      localStorage.setItem(LS_BLOCK_UNTIL_KEY, String(blockUntil));
+      localStorage.setItem(LS_ATTEMPTS_KEY, '0');
+      setError('Demasiados intentos fallidos. Has sido bloqueado por 5 minutos.');
+    } else {
+      setError(`Credenciales incorrectas. Intento ${newAttempts} de ${MAX_ATTEMPTS}.`);
+    }
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
@@ -47,7 +63,6 @@ export function LoginCard({ onSuccess }: Props) {
 
     setLoading(true);
     localStorage.setItem(LS_LOGIN_FLOW_KEY, '1');
-    let loginSucceeded = false;
     try {
       const blockUntil = getBlockUntil();
       if (Date.now() < blockUntil) {
@@ -56,50 +71,49 @@ export function LoginCard({ onSuccess }: Props) {
         return;
       }
 
-      const credential = await signInWithEmailAndPassword(getAuthClient(), email, password);
-      const deviceId = getDeviceId();
-      const sid = sessionIdFor(credential.user.uid, deviceId);
-      const existing = await getSessionById(sid);
-      if (existing?.blocked) {
-        await signOut(getAuthClient());
-        setError('Tu acceso está bloqueado. Contacta al administrador.');
+      let credential;
+      try {
+        credential = await signInWithEmailAndPassword(getAuthClient(), email, password);
+      } catch (authErr) {
+        if (authErr instanceof FirebaseError && authErr.code.startsWith('auth/')) {
+          registerFailedAttempt();
+          return;
+        }
+        registerFailedAttempt();
         return;
       }
 
-      localStorage.setItem('fh_login_at', String(Date.now()));
-      localStorage.setItem(LS_LAST_ACTIVE_AT_KEY, String(Date.now()));
-      localStorage.removeItem(LS_ATTEMPTS_KEY);
-      localStorage.removeItem(LS_BLOCK_UNTIL_KEY);
+      try {
+        const deviceId = getDeviceId();
+        const sid = sessionIdFor(credential.user.uid, deviceId);
+        const existing = await getSessionById(sid);
+        if (existing?.blocked) {
+          await signOut(getAuthClient());
+          setError('Tu acceso está bloqueado. Contacta al administrador.');
+          return;
+        }
 
-      const role: PanelRole = isAdmin ? 'admin' : 'guest';
-      await upsertSessionOnLogin({
-        uid: credential.user.uid,
-        email: credential.user.email || email,
-        role,
-        deviceId,
-      });
+        localStorage.setItem('fh_login_at', String(Date.now()));
+        localStorage.setItem(LS_LAST_ACTIVE_AT_KEY, String(Date.now()));
+        localStorage.removeItem(LS_ATTEMPTS_KEY);
+        localStorage.removeItem(LS_BLOCK_UNTIL_KEY);
 
-      loginSucceeded = true;
-      onSuccess();
-    } catch {
-      const attempts = getAttempts();
-      const newAttempts = attempts + 1;
-      localStorage.setItem(LS_ATTEMPTS_KEY, String(newAttempts));
+        const role: PanelRole = isAdmin ? 'admin' : 'guest';
+        await upsertSessionOnLogin({
+          uid: credential.user.uid,
+          email: credential.user.email || email,
+          role,
+          deviceId,
+        });
 
-      if (newAttempts >= MAX_ATTEMPTS) {
-        const blockUntil = Date.now() + BLOCK_TIME;
-        localStorage.setItem(LS_BLOCK_UNTIL_KEY, String(blockUntil));
-        localStorage.setItem(LS_ATTEMPTS_KEY, '0');
-        setError('Demasiados intentos fallidos. Has sido bloqueado por 5 minutos.');
-      } else {
-        setError(`Credenciales incorrectas. Intento ${newAttempts} de ${MAX_ATTEMPTS}.`);
+        onSuccess();
+      } catch {
+        await signOut(getAuthClient());
+        setError('No se pudo crear la sesión. Intenta de nuevo.');
       }
     } finally {
-      if (loginSucceeded) {
-        window.setTimeout(() => localStorage.removeItem(LS_LOGIN_FLOW_KEY), 2500);
-      } else {
-        localStorage.removeItem(LS_LOGIN_FLOW_KEY);
-      }
+      // Mantener fh_login_flow hasta que upsert termine; sin espera fija.
+      localStorage.removeItem(LS_LOGIN_FLOW_KEY);
       setLoading(false);
     }
   }

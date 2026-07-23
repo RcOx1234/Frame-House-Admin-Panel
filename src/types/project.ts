@@ -44,8 +44,12 @@ export interface Project {
   format: string;
   siteUrl?: string;
   featured?: boolean;
-  /** Si es false, oculto para invitados (solo admin lo ve en el panel) */
+  /** Si es false, oculto de la web (solo admin lo ve en el panel). visible !== false = publicado. */
   visible?: boolean;
+  /** Perfil de Instagram del proyecto (opcional) */
+  instagramUrl?: string;
+  /** Página de Facebook del proyecto (opcional) */
+  facebookUrl?: string;
   /** Solo tipo web: usar miniatura distinta de la imagen de preview */
   webSeparatePreview?: boolean;
 }
