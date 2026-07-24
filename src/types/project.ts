@@ -18,7 +18,7 @@ export type ProjectMediaItem = {
   kind: ProjectMediaKind;
   url: string;
   label?: string;
-  /** Solo imágenes: `contain` muestra la imagen completa con fondo desenfocado. Por defecto `cover`. */
+  /** `contain` muestra el media completo sin recortar (imagen: fondo desenfocado; vídeo: fondo ambiental). Por defecto `cover`. */
   displayMode?: 'cover' | 'contain';
 };
 
