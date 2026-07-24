@@ -228,7 +228,7 @@ export function ProjectFormModal({
           kind,
           url: x.url?.trim() || '',
           label: x.label?.trim() || undefined,
-          displayMode: kind === 'image' && x.displayMode === 'contain' ? ('contain' as const) : undefined,
+          displayMode: x.displayMode === 'contain' ? ('contain' as const) : undefined,
         };
       })
       .filter((x) => Boolean(x.url));

@@ -40,13 +40,33 @@ export function ProjectMediaCarousel({ items, initialIndex = 0, className = '', 
     <div className={`relative ${className}`}>
       <div className="relative h-52 w-full overflow-hidden rounded-lg bg-neutral-100 dark:bg-neutral-900">
         {current.kind === 'video' ? (
-          <video
-            src={current.url}
-            className="h-52 w-full object-cover"
-            controls
-            playsInline
-            preload="metadata"
-          />
+          current.displayMode === 'contain' ? (
+            <div className="relative h-52 w-full overflow-hidden">
+              <div
+                aria-hidden
+                className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(90,18,28,0.55)_0%,_transparent_58%),linear-gradient(145deg,#1a080c_0%,#050505_42%,#2a0c14_100%)]"
+              />
+              <div
+                aria-hidden
+                className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,_transparent_42%,_rgba(0,0,0,0.55)_100%)]"
+              />
+              <video
+                src={current.url}
+                className="relative z-10 h-52 w-full object-contain"
+                controls
+                playsInline
+                preload="metadata"
+              />
+            </div>
+          ) : (
+            <video
+              src={current.url}
+              className="h-52 w-full object-cover"
+              controls
+              playsInline
+              preload="metadata"
+            />
+          )
         ) : current.displayMode === 'contain' ? (
           <div className="relative h-52 w-full overflow-hidden">
             <img
