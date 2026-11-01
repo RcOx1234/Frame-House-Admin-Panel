@@ -36,7 +36,7 @@ function MediaMiniThumb({
   if (!trimmed) {
     return (
       <div
-        className={`flex items-center justify-center bg-neutral-200/80 text-[10px] text-neutral-500 dark:bg-neutral-800 dark:text-neutral-500 ${className ?? ''}`}
+        className={`flex items-center justify-center bg-line/80 text-[10px] text-muted dark:bg-line dark:text-muted ${className ?? ''}`}
         aria-hidden
       >
         —
@@ -91,7 +91,7 @@ function MediaEditPreview({
   const trimmed = url.trim();
   if (!trimmed) {
     return (
-      <div className="flex aspect-video w-full max-h-72 items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-neutral-100/80 text-sm text-neutral-500 dark:border-neutral-700 dark:bg-neutral-900/50 dark:text-neutral-400">
+      <div className="flex aspect-video w-full max-h-72 items-center justify-center rounded-xl border border-dashed border-line bg-canvas/80 text-sm text-muted dark:border-line dark:bg-surface/50 dark:text-muted">
         Añade un archivo o URL abajo para ver la vista previa.
       </div>
     );
@@ -99,7 +99,7 @@ function MediaEditPreview({
   if (kind === 'image') {
     if (displayMode === 'contain') {
       return (
-        <div className="relative flex max-h-72 w-full justify-center overflow-hidden rounded-xl border border-neutral-200 dark:border-neutral-800">
+        <div className="relative flex max-h-72 w-full justify-center overflow-hidden rounded-xl border border-line dark:border-line">
           <img
             src={trimmed}
             alt=""
@@ -116,14 +116,14 @@ function MediaEditPreview({
       );
     }
     return (
-      <div className="flex max-h-72 w-full justify-center overflow-hidden rounded-xl border border-neutral-200 bg-neutral-100/60 dark:border-neutral-800 dark:bg-neutral-900/40">
+      <div className="flex max-h-72 w-full justify-center overflow-hidden rounded-xl border border-line bg-canvas/60 dark:border-line dark:bg-surface/40">
         <img src={trimmed} alt="Vista previa" className="max-h-72 w-full object-contain" loading="lazy" />
       </div>
     );
   }
   if (displayMode === 'contain') {
     return (
-      <div className="relative max-h-72 w-full overflow-hidden rounded-xl border border-neutral-200 dark:border-neutral-800">
+      <div className="relative max-h-72 w-full overflow-hidden rounded-xl border border-line dark:border-line">
         <div
           aria-hidden
           className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(90,18,28,0.55)_0%,_transparent_58%),linear-gradient(145deg,#1a080c_0%,#050505_42%,#2a0c14_100%)]"
@@ -145,7 +145,7 @@ function MediaEditPreview({
     );
   }
   return (
-    <div className="overflow-hidden rounded-xl border border-neutral-200 bg-black/90 dark:border-neutral-800">
+    <div className="overflow-hidden rounded-xl border border-line bg-black/90 dark:border-line">
       <video src={trimmed} controls playsInline className="max-h-72 w-full object-cover" preload="metadata">
         Tu navegador no reproduce vídeo embebido.
       </video>
@@ -348,10 +348,10 @@ export function ProjectMediaEditor({
     <div className="panel-card-muted space-y-2 p-2">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-semibold uppercase tracking-wide text-neutral-600 dark:text-neutral-400">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted dark:text-muted">
             Galería (carrusel detalle)
           </p>
-          <p className="mt-0.5 text-[11px] leading-snug text-neutral-500 dark:text-neutral-500">
+          <p className="mt-0.5 text-[11px] leading-snug text-muted dark:text-muted">
             Mantén pulsada la tarjeta y arrastra para ordenar (también en móvil). Sobre ★ o Editar el cursor es normal.
             ★ = primer slide.
           </p>
@@ -361,7 +361,7 @@ export function ProjectMediaEditor({
           <button
             type="button"
             onClick={() => add('image')}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-amber-600 text-base font-semibold text-neutral-950 transition hover:bg-amber-500"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-brand text-base font-semibold text-white transition hover:bg-brand"
             title="Agregar imagen"
             aria-label="Agregar imagen"
           >
@@ -393,23 +393,23 @@ export function ProjectMediaEditor({
                 data-media-id={item.id}
                 onPointerDown={(e) => onCardPointerDown(e, item.id)}
                 title="Mantén pulsado y arrastra para reordenar (★ y Editar no arrastran)"
-                className={`group flex min-w-0 max-w-full select-none items-stretch gap-2 overflow-hidden rounded-lg border bg-white p-2 text-xs transition-[opacity,box-shadow,border-color] dark:bg-neutral-950 ${
+                className={`group flex min-w-0 max-w-full select-none items-stretch gap-2 overflow-hidden rounded-lg border bg-surface p-2 text-xs transition-[opacity,box-shadow,border-color] dark:bg-canvas ${
                   dragActiveId === item.id ? 'cursor-grabbing opacity-[0.72]' : 'cursor-grab'
                 } ${
                   isOver
-                    ? 'border-amber-500/60 ring-1 ring-amber-500/30'
-                    : 'border-neutral-200 dark:border-neutral-800'
+                    ? 'border-brand/60 ring-1 ring-brand/30'
+                    : 'border-line dark:border-line'
                 }`}
               >
-                <div className="h-12 w-12 shrink-0 overflow-hidden rounded-md border border-neutral-200 dark:border-neutral-700">
+                <div className="h-12 w-12 shrink-0 overflow-hidden rounded-md border border-line dark:border-line">
                   <MediaMiniThumb kind={item.kind} url={item.url} className="h-full w-full" />
                 </div>
 
                 <div className="flex min-w-0 flex-1 flex-col justify-center gap-1">
-                  <p className="truncate font-medium text-neutral-800 dark:text-neutral-100" title={itemTitle(item, idx)}>
+                  <p className="truncate font-medium text-ink dark:text-ink" title={itemTitle(item, idx)}>
                     {itemTitle(item, idx)}
                   </p>
-                  <p className="text-[10px] text-neutral-500 dark:text-neutral-500">
+                  <p className="text-[10px] text-muted dark:text-muted">
                     {item.displayMode === 'contain'
                       ? item.kind === 'video'
                         ? 'Vídeo · Completo'
@@ -427,7 +427,7 @@ export function ProjectMediaEditor({
                     draggable={false}
                     onClick={() => onChangeFeatured(item.id)}
                     className={`panel-btn-secondary px-2 py-0.5 text-sm leading-none ${
-                      isFeatured ? 'border-amber-500/40 bg-amber-950/30 text-amber-200' : ''
+                      isFeatured ? 'border-brand/40 bg-brandsoft/30 text-brand' : ''
                     }`}
                     title={isFeatured ? 'Primer slide del carrusel' : 'Marcar como primer slide'}
                     aria-label={isFeatured ? 'Primer slide del carrusel' : 'Marcar como primer slide'}
@@ -449,7 +449,7 @@ export function ProjectMediaEditor({
           })}
         </div>
       ) : (
-        <div className="rounded-lg border border-dashed border-neutral-300 bg-neutral-50/80 px-3 py-4 text-center text-[11px] text-neutral-600 dark:border-neutral-800 dark:bg-neutral-900/30 dark:text-neutral-500">
+        <div className="rounded-lg border border-dashed border-line bg-canvas/80 px-3 py-4 text-center text-[11px] text-muted dark:border-line dark:bg-surface/30 dark:text-muted">
           Sin ítems. Pulsa <span className="font-semibold">+</span>
           {allowVideo ? ' para imagen o vídeo.' : ' para añadir imágenes.'}
         </div>
@@ -469,12 +469,12 @@ export function ProjectMediaEditor({
             className="panel-modal-panel flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden shadow-2xl"
             onMouseDown={(e) => e.stopPropagation()}
           >
-            <div className="flex items-start justify-between gap-3 border-b border-neutral-200 px-4 py-3 dark:border-neutral-800">
+            <div className="flex items-start justify-between gap-3 border-b border-line px-4 py-3 dark:border-line">
               <div className="min-w-0">
-                <h2 id="project-media-edit-title" className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+                <h2 id="project-media-edit-title" className="text-sm font-semibold text-ink dark:text-ink">
                   Editar elemento del carrusel
                 </h2>
-                <p className="mt-0.5 text-[11px] text-neutral-500 dark:text-neutral-500">
+                <p className="mt-0.5 text-[11px] text-muted dark:text-muted">
                   Vista previa grande; en vídeo puedes reproducir aquí. Los cambios se guardan al cerrar el proyecto.
                 </p>
               </div>
@@ -496,7 +496,7 @@ export function ProjectMediaEditor({
               />
 
               <div className="space-y-2">
-                <label className="block text-[11px] font-medium uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+                <label className="block text-[11px] font-medium uppercase tracking-wide text-muted dark:text-muted">
                   Título / etiqueta
                 </label>
                 <input
@@ -509,7 +509,7 @@ export function ProjectMediaEditor({
 
               {allowVideo ? (
                 <div className="space-y-2">
-                  <span className="block text-[11px] font-medium uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+                  <span className="block text-[11px] font-medium uppercase tracking-wide text-muted dark:text-muted">
                     Tipo
                   </span>
                   <select
@@ -525,7 +525,7 @@ export function ProjectMediaEditor({
               ) : null}
 
               <div className="space-y-1">
-                <label className="inline-flex items-start gap-2 text-sm text-neutral-700 dark:text-neutral-300">
+                <label className="inline-flex items-start gap-2 text-sm text-ink dark:text-ink">
                   <input
                     type="checkbox"
                     className="mt-0.5"
@@ -542,7 +542,7 @@ export function ProjectMediaEditor({
                       : 'Mostrar imagen completa (sin recortar)'}
                   </span>
                 </label>
-                <p className="pl-6 text-[11px] leading-snug text-neutral-500 dark:text-neutral-500">
+                <p className="pl-6 text-[11px] leading-snug text-muted dark:text-muted">
                   {editingItem.kind === 'video'
                     ? 'Ideal para videos verticales o con una proporción distinta al visor. Se mostrará el encuadre original completo sobre un fondo ambiental de Frame House.'
                     : 'Ideal para flyers, afiches y diseños verticales. El espacio sobrante se rellenará con un fondo desenfocado.'}
@@ -560,7 +560,7 @@ export function ProjectMediaEditor({
                 showCurrentUrlFooter={false}
               />
 
-              <div className="flex flex-wrap items-center gap-2 border-t border-neutral-200 pt-3 dark:border-neutral-800">
+              <div className="flex flex-wrap items-center gap-2 border-t border-line pt-3 dark:border-line">
                 <button
                   type="button"
                   onClick={() => removeItem(editingItem.id)}

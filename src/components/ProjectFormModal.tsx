@@ -1,3 +1,4 @@
+import { useDialogFocus } from '../hooks/useDialogFocus';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLockBodyScrollMobile } from '../hooks/useLockBodyScrollMobile';
 import type { FilterType, Project, ProjectType } from '../types/project';
@@ -106,6 +107,7 @@ export function ProjectFormModal({
   const readyForDraftsRef = useRef(false);
 
   useLockBodyScrollMobile(open);
+  const dialogRef = useDialogFocus(open);
 
   useEffect(() => {
     if (!open) {
@@ -327,36 +329,37 @@ export function ProjectFormModal({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="panel-modal-panel flex max-h-[90vh] max-w-3xl flex-col overflow-hidden shadow-2xl">
-        <div className="flex items-center justify-between border-b border-neutral-200 px-6 py-4 dark:border-neutral-800">
-          <h2 className="text-base font-semibold text-neutral-900 dark:text-neutral-100">{title}</h2>
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={title} tabIndex={-1} className="panel-modal-panel studio-project-editor flex max-h-[90vh] max-w-3xl flex-col overflow-hidden shadow-2xl">
+        <div className="flex items-center justify-between border-b border-line px-6 py-4 dark:border-line">
+          <h2 className="text-base font-semibold text-ink dark:text-ink">{title}</h2>
           <button type="button" onClick={onClose} className="panel-btn-secondary py-1.5 text-xs">
             Cerrar
           </button>
         </div>
 
         <div className="flex-1 space-y-4 overflow-y-auto p-6 text-sm">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <input
+          <p className="editor-section-label">01 / INFORMACIÓN DEL PROYECTO</p><div className="grid gap-3 sm:grid-cols-2">
+            <label className="editor-field"><span>ID</span><input
               value={model.id}
               onChange={(e) => update('id', e.target.value)}
               placeholder="ID"
               className="panel-input"
               disabled={mode === 'create'}
-            />
-            <input
+            /></label>
+            <label className="editor-field"><span>Título</span><input
               value={model.title}
               onChange={(e) => update('title', e.target.value)}
               placeholder="Título"
               className="panel-input"
-            />
-            <input
+            /></label>
+            <label className="editor-field"><span>Cliente</span><input
               value={model.client}
               onChange={(e) => update('client', e.target.value)}
               placeholder="Cliente"
               className="panel-input"
-            />
-            <select
+            /></label>
+            <label className="editor-field"><span>Tipo</span><select
+              aria-label="Tipo de proyecto"
               value={model.type}
               onChange={(e) => updateType(e.target.value as ProjectType)}
               className="panel-input"
@@ -366,8 +369,9 @@ export function ProjectFormModal({
                   {t}
                 </option>
               ))}
-            </select>
-            <select
+            </select></label>
+            <label className="editor-field"><span>Categoría</span><select
+              aria-label="Categoría"
               value={model.category}
               onChange={(e) => update('category', e.target.value as FilterType)}
               className="panel-input"
@@ -377,21 +381,22 @@ export function ProjectFormModal({
                   {c}
                 </option>
               ))}
-            </select>
-            <input
+            </select></label>
+            <label className="editor-field"><span>Plataforma</span><input
               value={model.platform}
               onChange={(e) => update('platform', e.target.value)}
               placeholder="Plataforma"
               className="panel-input"
-            />
-            <input
+            /></label>
+            <label className="editor-field"><span>Formato</span><input
               value={model.format}
               onChange={(e) => update('format', e.target.value)}
               placeholder="Formato"
               className="panel-input"
-            />
+            /></label>
           </div>
 
+          <p className="editor-section-label">02 / CONTENIDO MULTIMEDIA</p>
           <MediaAssetInput
             key={`thumb-${open}-${mode}`}
             label="Miniatura (card)"
@@ -404,17 +409,17 @@ export function ProjectFormModal({
           />
 
           {mode === 'edit' && legacyMedia ? (
-            <div className="rounded-lg border border-amber-500/35 bg-amber-950/25 px-3 py-2.5 text-xs text-neutral-200 dark:text-neutral-300">
+            <div className="rounded-lg border border-brand/35 bg-brandsoft/25 px-3 py-2.5 text-xs text-ink dark:text-ink">
               <p>
                 Este proyecto usa el formato antiguo (vídeo preview o imagen grande web aparte). Puedes pasarlo a{' '}
-                <strong className="font-medium text-amber-200/90">miniatura + galería</strong>: se copian esos medios al
+                <strong className="font-medium text-brand/90">miniatura + galería</strong>: se copian esos medios al
                 carrusel y se limpian los campos viejos. Si la galería queda vacía, el detalle sigue usando la miniatura
                 como antes.
               </p>
               <button
                 type="button"
                 onClick={() => setModel((m) => migrateLegacyProjectMedia(m))}
-                className="mt-2 rounded-lg border border-amber-500/40 bg-amber-600/90 px-3 py-1.5 text-xs font-semibold text-neutral-950 transition hover:bg-amber-500"
+                className="mt-2 rounded-lg border border-brand/40 bg-brand/90 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand"
               >
                 Actualizar a formato nuevo
               </button>
@@ -432,62 +437,63 @@ export function ProjectFormModal({
           />
 
           {model.type === 'web' ? (
-            <input
+            <label className="editor-field"><span>URL del sitio</span><input
               value={model.siteUrl || ''}
               onChange={(e) => update('siteUrl', e.target.value)}
               placeholder="URL del sitio"
               className="panel-input w-full"
-            />
+            /></label>
           ) : null}
 
           {model.type === 'video' ? (
-            <input
+            <label className="editor-field"><span>Duración (00:45)</span><input
               value={model.duration || ''}
               onChange={(e) => update('duration', e.target.value)}
               placeholder="Duración (00:45)"
               className="panel-input w-full sm:max-w-xs"
-            />
+            /></label>
           ) : null}
 
-          <textarea
+          <p className="editor-section-label">03 / DESCRIPCIÓN Y PUBLICACIÓN</p>
+          <label className="editor-field"><span>Descripción</span><textarea
             value={model.description}
             onChange={(e) => update('description', e.target.value)}
             placeholder="Descripción"
             rows={4}
             className="panel-input w-full"
-          />
+          /></label>
 
-          <input
+          <label className="editor-field"><span>Tags separados por coma</span><input
             value={tagsText}
             onChange={(e) => setTagsText(e.target.value)}
             placeholder="Tags separados por coma"
             className="panel-input w-full"
-          />
+          /></label>
 
-          <div className="space-y-2 rounded-lg border border-neutral-200 p-3 dark:border-neutral-800">
-            <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">Redes del proyecto</p>
-            <input
+          <div className="space-y-2 rounded-lg border border-line p-3 dark:border-line">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted">Redes del proyecto</p>
+            <label className="editor-field"><span>Perfil de Instagram</span><input
               value={model.instagramUrl || ''}
               onChange={(e) => update('instagramUrl', e.target.value)}
               placeholder="Perfil de Instagram"
               className="panel-input w-full"
-            />
-            <input
+            /></label>
+            <label className="editor-field"><span>Página de Facebook</span><input
               value={model.facebookUrl || ''}
               onChange={(e) => update('facebookUrl', e.target.value)}
               placeholder="Página de Facebook"
               className="panel-input w-full"
-            />
-            <input
+            /></label>
+            <label className="editor-field"><span>Perfil o publicación de TikTok</span><input
               value={model.tiktokUrl || ''}
               onChange={(e) => update('tiktokUrl', e.target.value)}
               placeholder="Perfil o publicación de TikTok"
               className="panel-input w-full"
-            />
+            /></label>
           </div>
 
           <div className="flex flex-wrap gap-4">
-            <label className="inline-flex items-center gap-2 text-neutral-700 dark:text-neutral-300">
+            <label className="inline-flex items-center gap-2 text-ink dark:text-ink">
               <input
                 type="checkbox"
                 checked={Boolean(model.featured)}
@@ -495,7 +501,7 @@ export function ProjectFormModal({
               />
               Destacado
             </label>
-            <label className="inline-flex items-center gap-2 text-neutral-700 dark:text-neutral-300">
+            <label className="inline-flex items-center gap-2 text-ink dark:text-ink">
               <input
                 type="checkbox"
                 checked={model.visible !== false}
@@ -512,7 +518,7 @@ export function ProjectFormModal({
           ) : null}
         </div>
 
-        <div className="flex justify-end gap-2 border-t border-neutral-200 px-6 py-4 dark:border-neutral-800">
+        <div className="flex justify-end gap-2 border-t border-line px-6 py-4 dark:border-line">
           <button type="button" onClick={onClose} className="panel-btn-secondary" disabled={submitting}>
             Cancelar
           </button>
@@ -520,7 +526,7 @@ export function ProjectFormModal({
             type="button"
             onClick={() => void submit()}
             disabled={submitting}
-            className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-neutral-950 transition hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand disabled:cursor-not-allowed disabled:opacity-50"
           >
             {submitting ? 'Guardando…' : 'Guardar'}
           </button>

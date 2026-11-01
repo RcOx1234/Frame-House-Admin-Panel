@@ -38,7 +38,7 @@ export function ProjectMediaCarousel({ items, initialIndex = 0, className = '', 
 
   return (
     <div className={`relative ${className}`}>
-      <div className="relative h-52 w-full overflow-hidden rounded-lg bg-neutral-100 dark:bg-neutral-900">
+      <div className="relative h-52 w-full overflow-hidden rounded-lg bg-canvas dark:bg-surface">
         {current.kind === 'video' ? (
           current.displayMode === 'contain' ? (
             <div className="relative h-52 w-full overflow-hidden">
@@ -97,7 +97,7 @@ export function ProjectMediaCarousel({ items, initialIndex = 0, className = '', 
               type="button"
               onClick={prev}
               aria-label="Anterior"
-              className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full border border-neutral-200/60 bg-white/80 px-2 py-1 text-sm text-neutral-900 shadow-sm backdrop-blur hover:bg-white dark:border-neutral-700/70 dark:bg-neutral-950/60 dark:text-neutral-100"
+              className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full border border-line/60 bg-surface/80 px-2 py-1 text-sm text-muted shadow-sm backdrop-blur hover:bg-surface dark:border-line/70 dark:bg-canvas/60 dark:text-ink"
             >
               ‹
             </button>
@@ -105,7 +105,7 @@ export function ProjectMediaCarousel({ items, initialIndex = 0, className = '', 
               type="button"
               onClick={next}
               aria-label="Siguiente"
-              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full border border-neutral-200/60 bg-white/80 px-2 py-1 text-sm text-neutral-900 shadow-sm backdrop-blur hover:bg-white dark:border-neutral-700/70 dark:bg-neutral-950/60 dark:text-neutral-100"
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full border border-line/60 bg-surface/80 px-2 py-1 text-sm text-muted shadow-sm backdrop-blur hover:bg-surface dark:border-line/70 dark:bg-canvas/60 dark:text-ink"
             >
               ›
             </button>

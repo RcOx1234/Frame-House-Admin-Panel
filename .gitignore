@@ -7,3 +7,5 @@ dist
 .DS_Store
 functions/node_modules
 functions/lib
+/test-results/
+/playwright-report/

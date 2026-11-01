@@ -1,3 +1,4 @@
+import { useDialogFocus } from '../hooks/useDialogFocus';
 import { useEffect, useMemo } from 'react';
 import { useLockBodyScrollMobile } from '../hooks/useLockBodyScrollMobile';
 import type { Project } from '../types/project';
@@ -18,6 +19,7 @@ function isProbablyVideoUrl(url: string): boolean {
 
 export function ProjectDetailsModal({ open, project, useVideoPreview, onClose, onCopyId }: Props) {
   useLockBodyScrollMobile(open && Boolean(project));
+  const dialogRef = useDialogFocus(open && Boolean(project));
 
   const carouselItems = useMemo(() => (project ? getProjectCarouselItems(project) : []), [project]);
   const initialCarouselIndex = useMemo(
@@ -48,11 +50,11 @@ export function ProjectDetailsModal({ open, project, useVideoPreview, onClose, o
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="panel-modal-panel max-w-3xl overflow-hidden shadow-2xl transition-transform duration-200 ease-out">
-        <div className="flex items-start justify-between gap-3 border-b border-neutral-200 px-6 py-4 dark:border-neutral-800">
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={project.title} tabIndex={-1} className="panel-modal-panel max-w-3xl overflow-hidden shadow-2xl transition-transform duration-200 ease-out">
+        <div className="flex items-start justify-between gap-3 border-b border-line px-6 py-4 dark:border-line">
           <div>
-            <h2 className="text-base font-semibold text-neutral-900 dark:text-neutral-100">{project.title}</h2>
-            <p className="mt-1 font-mono text-xs text-neutral-500">{project.id}</p>
+            <h2 className="text-base font-semibold text-ink dark:text-ink">{project.title}</h2>
+            <p className="mt-1 font-mono text-xs text-muted">{project.id}</p>
           </div>
           <div className="flex gap-2">
             <button type="button" onClick={() => onCopyId(project.id)} className="panel-btn-secondary py-1.5 text-xs">
@@ -69,69 +71,69 @@ export function ProjectDetailsModal({ open, project, useVideoPreview, onClose, o
             <div className="panel-card-muted overflow-hidden p-3">
               <ProjectMediaCarousel items={carouselItems} initialIndex={initialCarouselIndex} altFallback={project.title} />
               {showPreviewNote ? (
-                <p className="mt-2 text-xs text-neutral-500 dark:text-neutral-500">Preview grande · miniatura puede diferir en la tarjeta</p>
+                <p className="mt-2 text-xs text-muted dark:text-muted">Preview grande · miniatura puede diferir en la tarjeta</p>
               ) : null}
             </div>
             <div className="panel-card-muted space-y-2 p-4 text-sm">
-              <p className="text-neutral-800 dark:text-neutral-200">
-                <span className="text-neutral-500 dark:text-neutral-500">Cliente:</span> {project.client}
+              <p className="text-ink dark:text-ink">
+                <span className="text-muted dark:text-muted">Cliente:</span> {project.client}
               </p>
-              <p className="text-neutral-800 dark:text-neutral-200">
-                <span className="text-neutral-500 dark:text-neutral-500">Tipo:</span> {project.type}
+              <p className="text-ink dark:text-ink">
+                <span className="text-muted dark:text-muted">Tipo:</span> {project.type}
               </p>
-              <p className="text-neutral-800 dark:text-neutral-200">
-                <span className="text-neutral-500 dark:text-neutral-500">Categoría:</span> {project.category}
+              <p className="text-ink dark:text-ink">
+                <span className="text-muted dark:text-muted">Categoría:</span> {project.category}
               </p>
-              <p className="text-neutral-800 dark:text-neutral-200">
-                <span className="text-neutral-500 dark:text-neutral-500">Formato:</span> {project.format}
+              <p className="text-ink dark:text-ink">
+                <span className="text-muted dark:text-muted">Formato:</span> {project.format}
               </p>
-              <p className="text-neutral-800 dark:text-neutral-200">
-                <span className="text-neutral-500 dark:text-neutral-500">Plataforma:</span> {project.platform}
+              <p className="text-ink dark:text-ink">
+                <span className="text-muted dark:text-muted">Plataforma:</span> {project.platform}
               </p>
-              <p className="text-neutral-800 dark:text-neutral-200">
-                <span className="text-neutral-500 dark:text-neutral-500">Duración:</span> {project.duration || '—'}
+              <p className="text-ink dark:text-ink">
+                <span className="text-muted dark:text-muted">Duración:</span> {project.duration || '—'}
               </p>
-              <p className="text-neutral-800 dark:text-neutral-200">
-                <span className="text-neutral-500 dark:text-neutral-500">Destacado:</span> {project.featured ? 'Sí' : 'No'}
+              <p className="text-ink dark:text-ink">
+                <span className="text-muted dark:text-muted">Destacado:</span> {project.featured ? 'Sí' : 'No'}
               </p>
-              <p className="text-neutral-800 dark:text-neutral-200">
-                <span className="text-neutral-500 dark:text-neutral-500">Estado web:</span>{' '}
+              <p className="text-ink dark:text-ink">
+                <span className="text-muted dark:text-muted">Estado web:</span>{' '}
                 {project.visible === false ? 'Oculto' : 'Publicado'}
               </p>
               {project.instagramUrl?.trim() ? (
-                <p className="text-neutral-800 dark:text-neutral-200">
-                  <span className="text-neutral-500 dark:text-neutral-500">Instagram:</span>{' '}
+                <p className="text-ink dark:text-ink">
+                  <span className="text-muted dark:text-muted">Instagram:</span>{' '}
                   <a
                     href={project.instagramUrl.trim()}
                     target="_blank"
                     rel="noreferrer"
-                    className="break-all text-amber-700 dark:text-amber-400"
+                    className="break-all text-brand dark:text-brand"
                   >
                     {project.instagramUrl.trim()}
                   </a>
                 </p>
               ) : null}
               {project.facebookUrl?.trim() ? (
-                <p className="text-neutral-800 dark:text-neutral-200">
-                  <span className="text-neutral-500 dark:text-neutral-500">Facebook:</span>{' '}
+                <p className="text-ink dark:text-ink">
+                  <span className="text-muted dark:text-muted">Facebook:</span>{' '}
                   <a
                     href={project.facebookUrl.trim()}
                     target="_blank"
                     rel="noreferrer"
-                    className="break-all text-amber-700 dark:text-amber-400"
+                    className="break-all text-brand dark:text-brand"
                   >
                     {project.facebookUrl.trim()}
                   </a>
                 </p>
               ) : null}
               {project.tiktokUrl?.trim() ? (
-                <p className="text-neutral-800 dark:text-neutral-200">
-                  <span className="text-neutral-500 dark:text-neutral-500">TikTok:</span>{' '}
+                <p className="text-ink dark:text-ink">
+                  <span className="text-muted dark:text-muted">TikTok:</span>{' '}
                   <a
                     href={project.tiktokUrl.trim()}
                     target="_blank"
                     rel="noreferrer"
-                    className="break-all text-amber-700 dark:text-amber-400"
+                    className="break-all text-brand dark:text-brand"
                   >
                     {project.tiktokUrl.trim()}
                   </a>
@@ -141,7 +143,7 @@ export function ProjectDetailsModal({ open, project, useVideoPreview, onClose, o
           </div>
 
           {showEmbedVideo && !previewVideoAlreadyInCarousel ? (
-            <div className="mt-4 overflow-hidden rounded-xl border border-neutral-200 bg-black/90 dark:border-neutral-800">
+            <div className="mt-4 overflow-hidden rounded-xl border border-line bg-black/90 dark:border-line">
               <video
                 src={project.previewVideo!.trim()}
                 className="max-h-[420px] w-full"
@@ -151,30 +153,30 @@ export function ProjectDetailsModal({ open, project, useVideoPreview, onClose, o
               />
             </div>
           ) : project.previewVideo?.trim() && !previewVideoAlreadyInCarousel ? (
-            <div className="panel-card-muted mt-4 p-4 text-sm text-neutral-700 dark:text-neutral-300">
-              <span className="text-neutral-500 dark:text-neutral-500">Preview video:</span>{' '}
-              <a href={project.previewVideo.trim()} target="_blank" rel="noreferrer" className="text-amber-700 dark:text-amber-400">
+            <div className="panel-card-muted mt-4 p-4 text-sm text-ink dark:text-ink">
+              <span className="text-muted dark:text-muted">Preview video:</span>{' '}
+              <a href={project.previewVideo.trim()} target="_blank" rel="noreferrer" className="text-brand dark:text-brand">
                 {project.previewVideo.trim()}
               </a>
             </div>
           ) : null}
 
-          <div className="panel-card-muted mt-4 p-4 text-sm text-neutral-700 dark:text-neutral-300">
-            <p className="text-neutral-500 dark:text-neutral-500">Descripción</p>
+          <div className="panel-card-muted mt-4 p-4 text-sm text-ink dark:text-ink">
+            <p className="text-muted dark:text-muted">Descripción</p>
             <p className="mt-2">{project.description || '—'}</p>
           </div>
 
-          <div className="panel-card-muted mt-4 p-4 text-sm text-neutral-700 dark:text-neutral-300">
-            <p className="text-neutral-500 dark:text-neutral-500">Tags</p>
+          <div className="panel-card-muted mt-4 p-4 text-sm text-ink dark:text-ink">
+            <p className="text-muted dark:text-muted">Tags</p>
             <div className="mt-2 flex flex-wrap gap-2">
               {(project.tags ?? []).length ? (
                 (project.tags ?? []).map((tag) => (
-                  <span key={tag} className="rounded-full border border-neutral-300 px-2 py-0.5 text-xs dark:border-neutral-700">
+                  <span key={tag} className="rounded-full border border-line px-2 py-0.5 text-xs dark:border-line">
                     {tag}
                   </span>
                 ))
               ) : (
-                <span className="text-neutral-500 dark:text-neutral-500">Sin tags</span>
+                <span className="text-muted dark:text-muted">Sin tags</span>
               )}
             </div>
           </div>
@@ -185,7 +187,7 @@ export function ProjectDetailsModal({ open, project, useVideoPreview, onClose, o
                 href={project.siteUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 transition hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100 dark:hover:bg-neutral-800"
+                className="inline-flex rounded-lg border border-line bg-surface px-3 py-2 text-sm text-muted transition hover:bg-canvas dark:border-line dark:bg-surface dark:text-ink dark:hover:bg-line"
               >
                 Abrir sitio
               </a>

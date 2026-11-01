@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { waitForLoginFlow } from './utils/loginFlow';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { onAuthStateChanged, signOut, type User } from 'firebase/auth';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { LoginCard } from './components/LoginCard';
-import { AdminPanel } from './pages/AdminPanel';
+const loadAdminPanel = () => import('./pages/AdminPanel');
+const AdminPanel = lazy(() => loadAdminPanel().then(m => ({ default: m.AdminPanel })));
 import type { PanelRole } from './types/cotizacion';
 import { getAuthClient } from './firebase';
 import { SessionExpiredScreen } from './components/SessionExpiredScreen';
@@ -28,21 +30,8 @@ const GUEST_EMAIL = 'invitado@framehouse.com';
 const SESSION_TTL_MS = 10 * 60 * 1000; // 10 minutos
 const SESSION_WARN_MS = 60_000;
 const LS_LOGIN_AT_KEY = 'fh_login_at';
-const LS_LOGIN_FLOW_KEY = 'fh_login_flow';
 const LS_LAST_ACTIVE_AT_KEY = 'fh_last_active_at';
 const ACTIVITY_THROTTLE_MS = 1000;
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => window.setTimeout(resolve, ms));
-}
-
-async function waitForLoginFlowToFinish(timeoutMs = 15_000): Promise<void> {
-  const started = Date.now();
-  while (localStorage.getItem(LS_LOGIN_FLOW_KEY) === '1') {
-    if (Date.now() - started > timeoutMs) break;
-    await sleep(50);
-  }
-}
 
 function readLastActiveAt(): number {
   return Number(localStorage.getItem(LS_LAST_ACTIVE_AT_KEY) || 0);
@@ -56,6 +45,8 @@ export default function App() {
   const { setTheme } = useTheme();
   const [user, setUser] = useState<User | null>(null);
   const [checking, setChecking] = useState(true);
+  const [sessionError, setSessionError] = useState(false);
+  const [restoreAttempt, setRestoreAttempt] = useState(0);
   const [sessionGateReady, setSessionGateReady] = useState(false);
   const [sessionExpired, setSessionExpired] = useState(false);
   const [showExpiryWarning, setShowExpiryWarning] = useState(false);
@@ -102,7 +93,9 @@ export default function App() {
 
   useEffect(() => {
     const unsub = onAuthStateChanged(getAuthClient(), (u) => {
+      setSessionGateReady(!u);
       setUser(u);
+      if (u) { void loadAdminPanel().catch(() => {}); }
       setChecking(false);
     });
     return () => unsub();
@@ -111,23 +104,22 @@ export default function App() {
   useEffect(() => {
     if (!user) {
       setCurrentSession(null);
-      setSessionGateReady(true);
+      setSessionGateReady(false);
       return;
     }
 
     let unsub: (() => void) | null = null;
     let cancelled = false;
     setSessionGateReady(false);
+    setSessionError(false);
 
     const run = async () => {
       const deviceId = getDeviceId();
       const role: PanelRole = user.email === ADMIN_EMAIL ? 'admin' : 'guest';
       const sid = sessionIdFor(user.uid, deviceId);
 
-      // Si hay login en curso, espera a que termine upsertSessionOnLogin antes de forceLogout.
-      if (localStorage.getItem(LS_LOGIN_FLOW_KEY) === '1') {
-        await waitForLoginFlowToFinish();
-      }
+      // Wait only for an actual login in this tab; no persistent/cross-tab stale flags.
+      await waitForLoginFlow();
       if (cancelled) return;
 
       const lastActiveAt = readLastActiveAt();
@@ -211,12 +203,18 @@ export default function App() {
       if (!cancelled) setSessionGateReady(true);
     };
 
-    void run();
+    const slowSessionTimer = window.setTimeout(() => {
+      if (!cancelled) setSessionError(true);
+    }, 12_000);
+    void run().catch(() => {
+      if (!cancelled) setSessionError(true);
+    }).finally(() => window.clearTimeout(slowSessionTimer));
     return () => {
       cancelled = true;
+      window.clearTimeout(slowSessionTimer);
       if (unsub) unsub();
     };
-  }, [user]);
+  }, [user, restoreAttempt]);
 
   useEffect(() => {
     if (!user) return;
@@ -343,6 +341,10 @@ export default function App() {
     await signOut(getAuthClient());
   }
 
+  if (user && sessionError && !sessionGateReady) {
+    return <div className="panel-shell flex items-center justify-center px-4 py-12"><div className="panel-card p-6 text-center" role="alert"><p>No se pudo verificar la sesión. Comprueba tu conexión y vuelve a intentar.</p><button type="button" className="panel-btn-secondary mt-4" onClick={() => setRestoreAttempt(n => n + 1)}>Reintentar</button></div></div>;
+  }
+
   if (checking || (user && !sessionGateReady)) {
     return (
       <div className="panel-shell flex items-center justify-center px-4 py-12">
@@ -388,13 +390,14 @@ export default function App() {
 
   if (!user || !role) {
     return (
-      <div className="panel-shell flex items-center justify-center px-4 py-12 max-md:h-[100dvh] max-md:min-h-0 max-md:overflow-hidden max-md:py-6">
+      <div className="panel-shell studio-login-shell">
         <LoginCard onSuccess={clearLoginAlerts} />
       </div>
     );
   }
 
   return (
+    <Suspense fallback={<div className="panel-shell flex items-center justify-center" role="status">Abriendo tu espacio de trabajo…</div>}>
     <AdminPanel
       role={role}
       onLogout={handleLogout}
@@ -412,5 +415,6 @@ export default function App() {
           : null
       }
     />
+    </Suspense>
   );
 }

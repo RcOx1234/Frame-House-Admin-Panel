@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { FileSpreadsheet } from 'lucide-react';
+import { StudioNav } from '../components/StudioNav';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import type { CotizacionDoc, PanelRole, PlanFilterValue, SortOrder } from '../types/cotizacion';
 import { deleteCotizacion, fetchCotizaciones } from '../services/cotizaciones';
 import { matchesSearch } from '../utils/search';
@@ -9,11 +11,10 @@ import { StatsCard } from '../components/StatsCard';
 import { CotizacionesTable } from '../components/CotizacionesTable';
 import { DetailsModal } from '../components/DetailsModal';
 import { CotizacionesGrid } from '../components/CotizacionesGrid';
-import { SidePanel } from '../components/SidePanel';
 import { SessionExpiryBanner } from '../components/SessionExpiryBanner';
-import { GallerySection } from '../components/GallerySection';
-import { SessionsSection } from '../components/SessionsSection';
-import { ConfiguracionesSection } from '../components/ConfiguracionesSection';
+const GallerySection = lazy(() => import('../components/GallerySection').then(m => ({ default: m.GallerySection })));
+const SessionsSection = lazy(() => import('../components/SessionsSection').then(m => ({ default: m.SessionsSection })));
+const ConfiguracionesSection = lazy(() => import('../components/ConfiguracionesSection').then(m => ({ default: m.ConfiguracionesSection })));
 type Props = {
   role: PanelRole;
   onLogout: () => void;
@@ -46,32 +47,12 @@ function IconButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-neutral-300 bg-white text-neutral-800 transition hover:bg-neutral-50 active:scale-[0.98] disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800"
+      className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-line bg-surface text-muted transition hover:bg-canvas active:scale-[0.98] disabled:opacity-50 dark:border-line dark:bg-surface dark:text-ink dark:hover:bg-line"
       aria-label={ariaLabel}
       title={title}
     >
       {children}
     </button>
-  );
-}
-
-/** Panel lateral a la derecha: contenido + franja (mismo patrón que el SidePanel). */
-function IconSidebarTools() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="h-5 w-5"
-      aria-hidden="true"
-    >
-      <rect x="3" y="4" width="18" height="16" rx="2" />
-      <line x1="15" y1="4" x2="15" y2="20" />
-    </svg>
   );
 }
 
@@ -138,26 +119,6 @@ function IconRefresh() {
   );
 }
 
-function IconDownload() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="h-4 w-4"
-      aria-hidden="true"
-    >
-      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-      <path d="M7 10l5 5 5-5" />
-      <path d="M12 15V3" />
-    </svg>
-  );
-}
-
 export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContext }: Props) {
   const [rows, setRows] = useState<CotizacionDoc[]>([]);
   const [loading, setLoading] = useState(false);
@@ -177,7 +138,7 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContex
     return saved === 'list' ? 'list' : 'cards';
   });
   const [focused, setFocused] = useState<boolean>(() => localStorage.getItem('fh_focused') === '1');
-  const [sideOpen, setSideOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [section, setSection] = useState<'registros' | 'galeria' | 'sesiones' | 'configuraciones'>(() => {
     const saved = localStorage.getItem('fh_admin_section');
     if (saved === 'galeria') return 'galeria';
@@ -263,12 +224,19 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContex
     }
   }
 
-  function handleExport() {
-    const stamp = new Date().toISOString().slice(0, 10);
-    void (async () => {
+  async function handleExport() {
+    if (exporting) return;
+    setExporting(true);
+    setError(null);
+    try {
+      const stamp = new Date().toISOString().slice(0, 10);
       const { exportCotizacionesToXlsx } = await import('../utils/exportExcel');
       await exportCotizacionesToXlsx(`cotizaciones_frame_house_${stamp}.xlsx`, filtered);
-    })();
+    } catch {
+      setError('No se pudo exportar el archivo Excel. Vuelve a intentarlo.');
+    } finally {
+      setExporting(false);
+    }
   }
 
   function toggleView() {
@@ -341,9 +309,9 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContex
   }
 
   useEffect(() => {
-    if (role !== 'admin') return;
+    if (role !== 'admin' || section !== 'sesiones') return;
     void loadSessions();
-  }, [loadSessions, role]);
+  }, [loadSessions, role, section]);
 
   useEffect(() => {
     if (section === 'configuraciones' && role !== 'admin') {
@@ -353,28 +321,23 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContex
   }, [role, section]);
 
   return (
-    <div className="panel-shell pb-12">
-      <header className="panel-header-bar">
+    <div className="panel-shell studio-shell pb-12">
+      <a className="skip-link" href="#studio-content">Ir al contenido</a>
+      <StudioNav section={section} role={role} onNavigate={openSection} onLogout={() => onLogout()} />
+      <header className="panel-header-bar studio-header">
         <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
-              Panel de administrador de FRAME HOUSE
+            <h1 className="text-lg font-semibold text-muted dark:text-ink">
+              FRAME HOUSE <span className="header-divider">/</span> <span className="header-location">{section === 'registros' ? 'Registros' : section === 'galeria' ? 'Galería' : section === 'sesiones' ? 'Sesiones' : 'Configuraciones'}</span>
             </h1>
-            <p className="text-sm text-neutral-600 dark:text-neutral-500">
+            <p className="text-sm text-muted dark:text-muted">
               Sesión:{' '}
-              <span className="text-neutral-800 dark:text-neutral-300">
+              <span className="text-muted dark:text-ink">
                 {role === 'admin' ? 'Administrador' : 'Invitado (solo lectura)'}
               </span>
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <IconButton
-              onClick={() => setSideOpen(true)}
-              title="Panel lateral · herramientas"
-              ariaLabel="Abrir panel lateral"
-            >
-              <IconSidebarTools />
-            </IconButton>
             {section !== 'configuraciones' ? (
               <IconButton
                 onClick={toggleView}
@@ -422,7 +385,7 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContex
               <button
                 type="button"
                 onClick={toggleFocused}
-                className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm font-medium text-neutral-200 transition hover:bg-neutral-800"
+                className="rounded-lg border border-line bg-surface px-3 py-2 text-sm font-medium text-ink transition hover:bg-line"
                 title={focused ? 'Salir de modo registros' : 'Modo registros'}
               >
                 {focused ? 'Vista normal' : 'Modo registros'}
@@ -437,16 +400,20 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContex
               <IconRefresh />
             </IconButton>
             {section === 'registros' ? (
-              <IconButton
-                onClick={handleExport}
-                disabled={!filtered.length}
-                title="Exportar"
-                ariaLabel="Exportar registros"
+              <button
+                type="button"
+                onClick={() => void handleExport()}
+                disabled={!filtered.length || exporting}
+                title="Descargar registros filtrados en Excel (.xlsx)"
+                aria-label="Exportar registros a Excel"
+                aria-busy={exporting}
+                className="panel-btn-secondary export-excel-button inline-flex items-center gap-2"
               >
-                <IconDownload />
-              </IconButton>
+                <FileSpreadsheet size={17} aria-hidden="true" />
+                <span>{exporting ? 'Exportando…' : 'Exportar Excel'}</span>
+              </button>
             ) : null}
-            <button type="button" onClick={() => onLogout()} className="panel-btn-secondary text-neutral-700 dark:text-neutral-400">
+            <button type="button" onClick={() => onLogout()} className="panel-btn-secondary text-muted dark:text-muted">
               Salir
             </button>
           </div>
@@ -462,7 +429,14 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContex
         </div>
       ) : null}
 
-      <main className="mx-auto max-w-6xl space-y-6 px-4 pt-6">
+      <main id="studio-content" className="studio-content mx-auto max-w-6xl space-y-6 px-4 pt-6">
+        <div className="studio-intro" key={section}>
+          <div><p className="studio-eyebrow">ADMIN STUDIO <span>/ {section === 'registros' ? '01' : section === 'galeria' ? '02' : section === 'sesiones' ? '03' : '04'}</span></p>
+          <h2>{section === 'registros' ? 'Registros' : section === 'galeria' ? 'Galería' : section === 'sesiones' ? 'Sesiones' : 'Configuraciones'}<span>.</span></h2>
+          <p>{section === 'registros' ? 'Cada gran proyecto empieza con una conversación.' : section === 'galeria' ? 'El trabajo que define a Frame House.' : section === 'sesiones' ? 'Una vista clara de tus dispositivos y accesos.' : 'Tu espacio de trabajo, a tu manera.'}</p></div>
+          <span className="studio-section-number" aria-hidden="true">{section === 'registros' ? '01' : section === 'galeria' ? '02' : section === 'sesiones' ? '03' : '04'}</span>
+        </div>
+        <Suspense fallback={<div className="panel-card p-8 text-center text-sm text-muted" role="status">Cargando sección…</div>}>
         {section === 'registros' ? (
           <>
             {!focused ? (
@@ -473,10 +447,10 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContex
               </div>
             ) : null}
 
-            <div className="rounded-xl border border-neutral-800 bg-neutral-900/50 p-4">
+            <div className="rounded-xl border border-line bg-surface/50 p-4">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
                 <div className="flex-1">
-                  <label htmlFor="search" className="text-xs font-medium uppercase text-neutral-500">
+                  <label htmlFor="search" className="text-xs font-medium uppercase text-muted">
                     Búsqueda
                   </label>
                   <input
@@ -485,20 +459,20 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContex
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     placeholder="Empresa, nombre, email o plan…"
-                    className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2.5 text-sm text-neutral-100 outline-none ring-amber-500/0 focus:border-neutral-600 focus:ring-2 focus:ring-amber-500/25"
+                    className="mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2.5 text-sm text-ink outline-none ring-brand/0 focus:border-line focus:ring-2 focus:ring-brand/25"
                   />
                 </div>
                 {!focused ? (
                   <>
                     <div className="w-full lg:w-48">
-                      <label htmlFor="plan" className="text-xs font-medium uppercase text-neutral-500">
+                      <label htmlFor="plan" className="text-xs font-medium uppercase text-muted">
                         Plan
                       </label>
                       <select
                         id="plan"
                         value={planFilter}
                         onChange={(e) => setPlanFilter(e.target.value as PlanFilterValue)}
-                        className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2.5 text-sm text-neutral-100 outline-none focus:border-neutral-600 focus:ring-2 focus:ring-amber-500/25"
+                        className="mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2.5 text-sm text-ink outline-none focus:border-line focus:ring-2 focus:ring-brand/25"
                       >
                         {PLAN_OPTIONS.map((o) => (
                           <option key={o.value} value={o.value}>
@@ -508,14 +482,14 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContex
                       </select>
                     </div>
                     <div className="w-full lg:w-44">
-                      <label htmlFor="sort" className="text-xs font-medium uppercase text-neutral-500">
+                      <label htmlFor="sort" className="text-xs font-medium uppercase text-muted">
                         Orden
                       </label>
                       <select
                         id="sort"
                         value={sortOrder}
                         onChange={(e) => setSortOrder(e.target.value as SortOrder)}
-                        className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2.5 text-sm text-neutral-100 outline-none focus:border-neutral-600 focus:ring-2 focus:ring-amber-500/25"
+                        className="mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2.5 text-sm text-ink outline-none focus:border-line focus:ring-2 focus:ring-brand/25"
                       >
                         <option value="desc">Fecha · más recientes</option>
                         <option value="asc">Fecha · más antiguos</option>
@@ -524,7 +498,7 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContex
                   </>
                 ) : null}
               </div>
-              {copyFeedback ? <p className="mt-3 text-sm text-amber-400/90">{copyFeedback}</p> : null}
+              {copyFeedback ? <p className="mt-3 text-sm text-brand/90">{copyFeedback}</p> : null}
             </div>
 
             {error ? (
@@ -552,8 +526,8 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContex
               />
             )}
 
-            <p className="text-center text-xs text-neutral-600">
-              ID de documento disponible en la exportación CSV · Actualización manual de lista
+            <p className="text-center text-xs text-muted">
+              ID de documento disponible en la exportación Excel · Actualización manual de lista
             </p>
           </>
         ) : section === 'galeria' ? (
@@ -578,6 +552,7 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContex
             onRefresh={() => void loadSessions()}
           />
         )}
+        </Suspense>
       </main>
       <DetailsModal
         open={Boolean(detailsRow)}
@@ -590,46 +565,7 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContex
         }}
         onClose={() => setDetailsRow(null)}
       />
-      <SidePanel
-        open={sideOpen}
-        role={role}
-        viewMode={
-          section === 'registros'
-            ? viewMode
-            : section === 'sesiones'
-              ? sessionsViewMode
-              : section === 'configuraciones'
-                ? 'cards'
-                : galleryViewMode
-        }
-        focused={focused}
-        section={section}
-        onClose={() => setSideOpen(false)}
-        onToggleFocused={toggleFocused}
-        onToggleView={toggleView}
-        onRefresh={reloadCurrentSection}
-        onOpenGallery={() => {
-          openSection('galeria');
-          setSideOpen(false);
-        }}
-        onOpenSessions={() => {
-          openSection('sesiones');
-          setSideOpen(false);
-        }}
-        onOpenConfig={() => {
-          openSection('configuraciones');
-          setSideOpen(false);
-        }}
-        onOpenRegistros={() => {
-          openSection('registros');
-          setSideOpen(false);
-        }}
-        sessions={sessions}
-        sessionsLoading={sessionsLoading}
-        sessionsError={sessionsError}
-        onRefreshSessions={() => void loadSessions()}
-        sessionContext={sessionContext}
-      />
+
     </div>
   );
 }
