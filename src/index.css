@@ -147,3 +147,4 @@ input:not([type=checkbox]):not([type=radio]),select,textarea { font-size:16px; }
 .studio-empty h3 { font-weight:600; margin-top:14px; }.studio-empty p { font-size:12px; color:rgb(var(--muted)); margin-top:8px; }
 @media(max-width:767px) { .studio-project-editor>div:first-child { padding:18px; } .studio-project-editor>div:nth-child(2) { padding:0 18px 24px; } .gallery-project-card>img { height:190px; } }
 .editor-field>select { height:44px; width:100%; background:rgb(var(--surface)); }
+@media(min-width:768px) { .login-art-scene { width:78%; left:11%; top:24px; } }
