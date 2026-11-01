@@ -1,6 +1,6 @@
 import { FileSpreadsheet } from 'lucide-react';
 import { StudioNav } from '../components/StudioNav';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import type { CotizacionDoc, PanelRole, PlanFilterValue, SortOrder } from '../types/cotizacion';
 import { deleteCotizacion, fetchCotizaciones } from '../services/cotizaciones';
 import { matchesSearch } from '../utils/search';
@@ -12,9 +12,9 @@ import { CotizacionesTable } from '../components/CotizacionesTable';
 import { DetailsModal } from '../components/DetailsModal';
 import { CotizacionesGrid } from '../components/CotizacionesGrid';
 import { SessionExpiryBanner } from '../components/SessionExpiryBanner';
-import { GallerySection } from '../components/GallerySection';
-import { SessionsSection } from '../components/SessionsSection';
-import { ConfiguracionesSection } from '../components/ConfiguracionesSection';
+const GallerySection = lazy(() => import('../components/GallerySection').then(m => ({ default: m.GallerySection })));
+const SessionsSection = lazy(() => import('../components/SessionsSection').then(m => ({ default: m.SessionsSection })));
+const ConfiguracionesSection = lazy(() => import('../components/ConfiguracionesSection').then(m => ({ default: m.ConfiguracionesSection })));
 type Props = {
   role: PanelRole;
   onLogout: () => void;
@@ -309,9 +309,9 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContex
   }
 
   useEffect(() => {
-    if (role !== 'admin') return;
+    if (role !== 'admin' || section !== 'sesiones') return;
     void loadSessions();
-  }, [loadSessions, role]);
+  }, [loadSessions, role, section]);
 
   useEffect(() => {
     if (section === 'configuraciones' && role !== 'admin') {
@@ -436,6 +436,7 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContex
           <p>{section === 'registros' ? 'Cada gran proyecto empieza con una conversación.' : section === 'galeria' ? 'El trabajo que define a Frame House.' : section === 'sesiones' ? 'Una vista clara de tus dispositivos y accesos.' : 'Tu espacio de trabajo, a tu manera.'}</p></div>
           <span className="studio-section-number" aria-hidden="true">{section === 'registros' ? '01' : section === 'galeria' ? '02' : section === 'sesiones' ? '03' : '04'}</span>
         </div>
+        <Suspense fallback={<div className="panel-card p-8 text-center text-sm text-muted" role="status">Cargando sección…</div>}>
         {section === 'registros' ? (
           <>
             {!focused ? (
@@ -551,6 +552,7 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContex
             onRefresh={() => void loadSessions()}
           />
         )}
+        </Suspense>
       </main>
       <DetailsModal
         open={Boolean(detailsRow)}

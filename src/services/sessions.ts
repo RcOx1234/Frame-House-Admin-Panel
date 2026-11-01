@@ -12,7 +12,8 @@ import {
   updateDoc,
   type Timestamp,
 } from 'firebase/firestore';
-import { getDb } from '../firebase';
+import { getAuthClient, getDb } from '../firebase';
+import { getGeoMeta } from './sessionGeo';
 import type { PanelRole } from '../types/cotizacion';
 
 export type SessionDoc = {
@@ -126,21 +127,15 @@ function getClientMeta() {
   };
 }
 
-async function getGeoMeta(): Promise<{ country: string; city: string }> {
-  const fallback = { country: 'Desconocido', city: 'Desconocido' };
-  try {
-    const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort(), 2500);
-    const res = await fetch('https://ipapi.co/json/', { signal: controller.signal });
-    window.clearTimeout(timeout);
-    if (!res.ok) return fallback;
-    const data = (await res.json()) as { country_name?: unknown; city?: unknown };
-    const country = typeof data.country_name === 'string' && data.country_name.trim() ? data.country_name : fallback.country;
-    const city = typeof data.city === 'string' && data.city.trim() ? data.city : fallback.city;
-    return { country, city };
-  } catch {
-    return fallback;
-  };
+/** Location is enriched after the essential session write, never before panel access. */
+function enrichSessionLocation(id: string, uid: string): void {
+  void getGeoMeta().then(async geo => {
+    if (getAuthClient().currentUser?.uid !== uid) return;
+    const patch: Partial<typeof geo> = {};
+    if (geo.country !== 'Desconocido') patch.country = geo.country;
+    if (geo.city !== 'Desconocido') patch.city = geo.city;
+    if (Object.keys(patch).length) await updateDoc(doc(getDb(), 'sessions', id), patch);
+  }).catch(() => { /* Optional metadata must not block login or produce unhandled errors. */ });
 }
 
 /** Tras login con contraseña: limpia cierre remoto y marca sesión activa. */
@@ -157,7 +152,6 @@ export async function upsertSessionOnLogin(input: {
   const existing = await getDoc(ref);
   const createdAt = existing.exists() ? undefined : serverTimestamp();
   const meta = getClientMeta();
-  const geo = await getGeoMeta();
 
   await setDoc(
     ref,
@@ -167,7 +161,6 @@ export async function upsertSessionOnLogin(input: {
       role: input.role,
       deviceId: input.deviceId,
       ...meta,
-      ...geo,
       ...(createdAt ? { createdAt } : {}),
       lastSeen: serverTimestamp(),
       isActive: true,
@@ -177,6 +170,7 @@ export async function upsertSessionOnLogin(input: {
     { merge: true }
   );
 
+  enrichSessionLocation(id, input.uid);
   return id;
 }
 
@@ -197,7 +191,6 @@ export async function upsertSessionOnAuthRestore(input: {
   const existing = await getDoc(ref);
   const createdAt = existing.exists() ? undefined : serverTimestamp();
   const meta = getClientMeta();
-  const geo = await getGeoMeta();
 
   await setDoc(
     ref,
@@ -207,7 +200,6 @@ export async function upsertSessionOnAuthRestore(input: {
       role: input.role,
       deviceId: input.deviceId,
       ...meta,
-      ...geo,
       ...(createdAt ? { createdAt, blocked: false, forceLogout: false } : {}),
       lastSeen: serverTimestamp(),
       isActive: true,
@@ -215,6 +207,7 @@ export async function upsertSessionOnAuthRestore(input: {
     { merge: true }
   );
 
+  enrichSessionLocation(id, input.uid);
   return id;
 }
 

@@ -1,3 +1,4 @@
+import { beginLoginFlow } from '../utils/loginFlow';
 import { lazy, Suspense } from 'react';
 const BrandMotion = lazy(() => import('./BrandMotion'));
 import { useMemo, useState, type FormEvent } from 'react';
@@ -17,7 +18,6 @@ const MAX_ATTEMPTS = 5;
 const BLOCK_TIME = 5 * 60 * 1000; // 5 minutos
 const LS_ATTEMPTS_KEY = 'loginAttempts';
 const LS_BLOCK_UNTIL_KEY = 'blockUntil';
-const LS_LOGIN_FLOW_KEY = 'fh_login_flow';
 const LS_LAST_ACTIVE_AT_KEY = 'fh_last_active_at';
 
 const ADMIN_EMAIL = ADMIN_PANEL_EMAIL;
@@ -64,7 +64,7 @@ export function LoginCard({ onSuccess }: Props) {
     }
 
     setLoading(true);
-    localStorage.setItem(LS_LOGIN_FLOW_KEY, '1');
+    const finishLoginFlow = beginLoginFlow();
     try {
       const blockUntil = getBlockUntil();
       if (Date.now() < blockUntil) {
@@ -114,8 +114,7 @@ export function LoginCard({ onSuccess }: Props) {
         setError('No se pudo crear la sesión. Intenta de nuevo.');
       }
     } finally {
-      // Mantener fh_login_flow hasta que upsert termine; sin espera fija.
-      localStorage.removeItem(LS_LOGIN_FLOW_KEY);
+      finishLoginFlow();
       setLoading(false);
     }
   }

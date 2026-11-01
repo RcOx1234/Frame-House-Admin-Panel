@@ -92,3 +92,7 @@ This was not executed: the connected tools provide Vercel/GitHub access, but no 
 - ImageKit: errores de creación, versión, lectura, borrado y Firestore se traducen a diagnósticos por etapa; errores y confirmaciones visibles en el modal. Rotación con ALREADY_EXISTS por código numérico. Sin registrar ni devolver excepciones crudas/keys.
 - Firebase predeploy compila antes de publicar; runtime Node.js 22. Guía completa: docs/IMAGEKIT-DEPLOY.md.
 - No se desplegó Firebase ni se cambiaron IAM, APIs o secretos reales. El diagnóstico definitivo de la infraestructura requiere el despliegue y los logs del proyecto.
+
+## Optimización de entrada y carga
+
+Se retiraron la consulta de ubicación y la marca persistente de login de las esperas necesarias para entrar; la autorización y el guardado esencial de sesión siguen siendo obligatorios. Panel y secciones se descargan bajo demanda; tipografías locales; errores de verificación recuperables. Archivo JavaScript inicial: 833.75 → 710.27 kB sin comprimir. Detalle y límites de medición: docs/LOADING-AUDIT.md. Cambios exclusivos del frontend, sin nuevo despliegue de Firebase.
