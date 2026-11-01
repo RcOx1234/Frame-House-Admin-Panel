@@ -14,7 +14,6 @@ export function FrameScene({ still = false }: { still?: boolean }) {
       <path d="M288 292h66m-66 0v63m0-30h47" stroke="#F7F4EF" strokeWidth="13"/>
       <path d="M93 107v-18h18m418 0h18v18M93 533v18h18m418 0h18v-18" stroke="#D61E2B" strokeWidth="2"/>
       <circle cx="495" cy="153" r="5" fill="#D61E2B"/>
-      <text x="88" y="590" fill="#B7B0A7" fontSize="10" letterSpacing="3" fontFamily="monospace">IDEA / FRAME / CREATE</text>
     </svg>
   </AbsoluteFill>;
 }
