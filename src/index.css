@@ -148,3 +148,13 @@ input:not([type=checkbox]):not([type=radio]),select,textarea { font-size:16px; }
 @media(max-width:767px) { .studio-project-editor>div:first-child { padding:18px; } .studio-project-editor>div:nth-child(2) { padding:0 18px 24px; } .gallery-project-card>img { height:190px; } }
 .editor-field>select { height:44px; width:100%; background:rgb(var(--surface)); }
 @media(min-width:768px) { .login-art-scene { width:78%; left:11%; top:24px; } }
+
+/* One navigation only; account block stays clear of the desktop bottom edge. */
+@media(min-width:768px) {
+  .studio-nav { padding-bottom:30px; }
+  .studio-nav nav button { min-height:52px; }
+  .studio-nav-bottom { gap:18px; padding-top:24px; padding-bottom:8px; }
+  .studio-profile { margin-top:0; padding:14px 10px; border:1px solid rgb(var(--line)); border-radius:12px; background:rgb(var(--canvas)); }
+}
+.export-excel-button { min-height:40px; }
+.export-excel-button>svg { color:#3b9d72; }

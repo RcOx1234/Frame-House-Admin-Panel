@@ -5,6 +5,9 @@ function formatCallableError(error: unknown, fallback: string): Error {
   if (error instanceof Error) {
     const maybeCode = (error as Error & { code?: string }).code;
     const maybeDetails = (error as Error & { details?: unknown }).details;
+    if (maybeCode === 'functions/internal' && (!maybeDetails || error.message.toLowerCase() === 'internal')) {
+      return new Error('El servidor Firebase devolvió internal sin diagnóstico. Despliega las cuatro Functions actualizadas desde esta rama en frame-house-datos y revisa Secret Manager API y los permisos IAM de la cuenta de ejecución. Guía: docs/IMAGEKIT-DEPLOY.md.');
+    }
     const maybeMessage = (error as Error & { message?: string }).message;
     const detailsText =
       typeof maybeDetails === 'string'

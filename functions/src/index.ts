@@ -3,279 +3,108 @@ import { SecretManagerServiceClient } from '@google-cloud/secret-manager';
 import { initializeApp, getApps } from 'firebase-admin/app';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
+import { cloudCode, IMAGEKIT_BACKEND_RELEASE, persistPrivateKey, runCloudOperation } from './cloudOperations';
 
 const ADMIN_PANEL_EMAIL = 'admin@framehouse.com';
-
 const INTEGRATIONS_PATH = 'panel_settings/general/integrations';
-
-function buildImageKitSecretName(integrationId: string) {
-  return `IMAGEKIT_PRIVATE_KEY_${integrationId}`.replace(/-/g, '_').toUpperCase();
-}
-
-function secretResourceName(projectId: string, integrationId: string): string {
-  return `projects/${projectId}/secrets/${buildImageKitSecretName(integrationId)}`;
-}
+const CALLABLE_OPTIONS = { cors: true, region: 'us-central1', timeoutSeconds: 60 } as const;
 
 function ensureAdmin(request: { auth?: { token?: Record<string, unknown> } }): void {
-  const email = request.auth?.token?.email;
-  if (!email || email !== ADMIN_PANEL_EMAIL) {
-    throw new HttpsError('permission-denied', 'Solo el administrador del panel puede usar esta función.');
-  }
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Inicia sesión para gestionar ImageKit.');
+  if (request.auth.token?.email !== ADMIN_PANEL_EMAIL) throw new HttpsError('permission-denied', 'Solo el administrador puede gestionar ImageKit.');
 }
-
 function app() {
   if (!getApps().length) initializeApp();
   return getApps()[0]!;
 }
-
 function integrationSecretId(integrationId: string): string {
-  if (!/^[a-zA-Z0-9_-]+$/.test(integrationId)) {
-    throw new HttpsError('invalid-argument', 'integrationId no válido');
-  }
-  return buildImageKitSecretName(integrationId);
+  if (!/^[a-zA-Z0-9_-]+$/.test(integrationId)) throw new HttpsError('invalid-argument', 'integrationId no válido');
+  // Keep existing secret IDs compatible with already saved credentials.
+  return `IMAGEKIT_PRIVATE_KEY_${integrationId}`.replace(/-/g, '_').toUpperCase();
 }
-
 function resolveProjectId(): string {
-  const projectId = process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT || app().options.projectId;
-  if (!projectId) {
-    throw new HttpsError(
-      'internal',
-      'No se pudo resolver projectId (GCLOUD_PROJECT/GCP_PROJECT). Verifica variables de entorno en Cloud Functions.'
-    );
-  }
-  return projectId;
+  const id = process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT || app().options.projectId;
+  if (!id) throw new HttpsError('failed-precondition', 'No se pudo resolver el proyecto Firebase de ejecución.');
+  return id;
 }
-
+function readIntegrationId(data: unknown): string {
+  const id = typeof (data as { integrationId?: unknown })?.integrationId === 'string'
+    ? (data as { integrationId: string }).integrationId.trim() : '';
+  integrationSecretId(id);
+  return id;
+}
+type IntegrationSnap = { provider?: string; active?: boolean; publicKey?: string; urlEndpoint?: string };
+async function integration(integrationId: string) {
+  const ref = getFirestore(app()).doc(`${INTEGRATIONS_PATH}/${integrationId}`);
+  const snap = await runCloudOperation('read-integration', () => ref.get());
+  if (!snap.exists) throw new HttpsError('not-found', 'Guarda primero la cuenta ImageKit en las configuraciones del panel.');
+  const row = snap.data() as IntegrationSnap;
+  if (row.provider !== 'imagekit') throw new HttpsError('failed-precondition', 'La integración no es ImageKit.');
+  return { ref, row };
+}
 async function readPrivateKey(projectId: string, integrationId: string): Promise<string> {
   const client = new SecretManagerServiceClient();
-  const name = `${secretResourceName(projectId, integrationId)}/versions/latest`;
-  try {
-    const [version] = await client.accessSecretVersion({ name });
-    const payload = version.payload?.data;
-    const key =
-      typeof payload === 'string' ? payload : payload instanceof Uint8Array ? Buffer.from(payload).toString('utf8') : '';
-    const trimmed = key.trim();
-    if (!trimmed) throw new Error('empty');
-    return trimmed;
-  } catch {
-    const secretId = integrationSecretId(integrationId);
-    throw new HttpsError(
-      'failed-precondition',
-      `No se encontró o no se puede leer el secret ${secretId}. Créalo con el panel o con: firebase functions:secrets:set ${secretId}`
-    );
-  }
+  const [version] = await runCloudOperation('read-secret', () => client.accessSecretVersion({ name: `projects/${projectId}/secrets/${integrationSecretId(integrationId)}/versions/latest` }));
+  const data = version.payload?.data;
+  const key = (typeof data === 'string' ? data : data instanceof Uint8Array ? Buffer.from(data).toString('utf8') : '').trim();
+  if (!key) throw new HttpsError('failed-precondition', 'El secreto de ImageKit está vacío. Guarda una private key válida.');
+  return key;
 }
 
-type IntegrationSnap = {
-  provider?: string;
-  active?: boolean;
-  publicKey?: string;
-  urlEndpoint?: string;
-};
-
-/** Firma cliente ImageKit: token, expire, signature + claves públicas desde Firestore. */
-export const getImageKitUploadAuth = onCall({ cors: true, region: 'us-central1' }, async (request) => {
-    ensureAdmin(request);
-    const integrationId = typeof request.data?.integrationId === 'string' ? request.data.integrationId.trim() : '';
-    if (!integrationId) {
-      throw new HttpsError('invalid-argument', 'integrationId es obligatorio');
-    }
-    const normalizedSecretName = integrationSecretId(integrationId);
-    console.log('Normalized secret:', normalizedSecretName);
-
-    const projectId = process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT || app().options.projectId;
-    if (!projectId) {
-      throw new HttpsError('internal', 'No se pudo resolver el proyecto');
-    }
-
-    const db = getFirestore(app());
-    const docRef = db.doc(`${INTEGRATIONS_PATH}/${integrationId}`);
-    const snap = await docRef.get();
-    if (!snap.exists) {
-      throw new HttpsError('not-found', 'Integración no encontrada');
-    }
-    const row = snap.data() as IntegrationSnap;
-    if (row.provider !== 'imagekit') {
-      throw new HttpsError('failed-precondition', 'La integración no es ImageKit');
-    }
-    if (row.active === false) {
-      throw new HttpsError('failed-precondition', 'La integración ImageKit está inactiva');
-    }
-    const publicKey = typeof row.publicKey === 'string' ? row.publicKey.trim() : '';
-    const urlEndpoint = typeof row.urlEndpoint === 'string' ? row.urlEndpoint.trim() : '';
-    if (!publicKey || !urlEndpoint) {
-      throw new HttpsError('failed-precondition', 'Configura publicKey y urlEndpoint en la integración');
-    }
-
-    const privateKey = await readPrivateKey(projectId, integrationId);
-    const token = crypto.randomBytes(16).toString('hex');
-    const expire = Math.floor(Date.now() / 1000) + 30 * 60;
-    const signature = crypto.createHmac('sha1', privateKey).update(token + expire).digest('hex');
-
-    return { token, expire, signature, publicKey, urlEndpoint };
-  }
-);
-
-/** Guarda la private key en Secret Manager y marca hasPrivateKey en Firestore (nunca sale al cliente). */
-export const setImageKitPrivateKey = onCall({ cors: true, region: 'us-central1' }, async (request) => {
+/** Stable Upload V1 signature; private credentials never leave Firebase. */
+export const getImageKitUploadAuth = onCall(CALLABLE_OPTIONS, async (request) => {
   ensureAdmin(request);
-  const integrationId =
-    typeof request.data?.integrationId === 'string' ? request.data.integrationId.trim() : '';
-  const privateKey =
-    typeof request.data?.privateKey === 'string' ? request.data.privateKey.trim() : '';
-
-  if (!integrationId || !privateKey) {
-    throw new HttpsError('invalid-argument', 'integrationId y privateKey son obligatorios');
-  }
-
-  if (!privateKey.startsWith('private_') || /\s/.test(privateKey)) {
-    throw new HttpsError('invalid-argument', 'Usa la private key completa de ImageKit (private_…), sin espacios.');
-  }
-  const secretId = integrationSecretId(integrationId); // validates chars + normaliza formato
-  console.log('Normalized secret:', secretId);
-  const projectId = resolveProjectId();
-
-  const db = getFirestore(app());
-  const docRef = db.doc(`${INTEGRATIONS_PATH}/${integrationId}`);
-  const snap = await docRef.get();
-  if (!snap.exists) {
-    throw new HttpsError('not-found', 'Integración no encontrada. Guarda antes la cuenta en Firestore desde el panel.');
-  }
-  const row = snap.data() as IntegrationSnap;
-  if (row.provider !== 'imagekit') {
-    throw new HttpsError('failed-precondition', 'Solo aplica a integraciones ImageKit');
-  }
-
-  const client = new SecretManagerServiceClient();
-  const parent = `projects/${projectId}`;
-  const secretName = secretResourceName(projectId, integrationId);
-  console.log('Creating secret:', secretName);
-
-  try {
-    await client.createSecret({
-      parent,
-      secretId,
-      secret: {
-        replication: {
-          automatic: {},
-        },
-      },
-    });
-    console.log('Secret created');
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e);
-    console.error(e);
-    const lower = msg.toLowerCase();
-    if (!lower.includes('already exists')) {
-      throw new HttpsError(
-        'internal',
-        `Error creando secret ${secretName} en project ${projectId}: ${msg}. Verifica permisos IAM de la service account de Cloud Functions Gen2 para Secret Manager (roles/secretmanager.admin o roles/secretmanager.secretVersionAdder + acceso al secret).`
-      );
-    }
-    console.log('Secret already exists, continuing with new version');
-  }
-
-  try {
-    console.log('Adding secret version');
-    await client.addSecretVersion({
-      parent: secretName,
-      payload: {
-        data: Buffer.from(privateKey, 'utf8'),
-      },
-    });
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e);
-    console.error(e);
-    throw new HttpsError(
-      'internal',
-      `Error agregando versión al secret ${secretName} en project ${projectId}: ${msg}. Verifica permisos IAM para addSecretVersion en Secret Manager.`
-    );
-  }
-
-  try {
-    await docRef.set(
-      {
-        hasPrivateKey: true,
-        updatedAt: FieldValue.serverTimestamp(),
-      },
-      { merge: true }
-    );
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e);
-    console.error(e);
-    throw new HttpsError(
-      'internal',
-      `La private key se guardó en Secret Manager (${secretName}), pero falló actualizar Firestore: ${msg}`
-    );
-  }
-
-  console.log('Secret saved successfully');
-
-  return { ok: true as const };
+  const id = readIntegrationId(request.data);
+  const { row } = await integration(id);
+  if (row.active === false) throw new HttpsError('failed-precondition', 'La integración ImageKit está inactiva.');
+  const publicKey = row.publicKey?.trim() || '';
+  const urlEndpoint = row.urlEndpoint?.trim() || '';
+  if (!publicKey || !urlEndpoint) throw new HttpsError('failed-precondition', 'Configura publicKey y urlEndpoint.');
+  const privateKey = await readPrivateKey(resolveProjectId(), id);
+  const token = crypto.randomBytes(16).toString('hex');
+  const expire = Math.floor(Date.now() / 1000) + 30 * 60;
+  const signature = crypto.createHmac('sha1', privateKey).update(token + expire).digest('hex');
+  return { token, expire, signature, publicKey, urlEndpoint, backendRelease: IMAGEKIT_BACKEND_RELEASE };
 });
 
-/** Elimina el secret de Secret Manager y marca hasPrivateKey=false en Firestore. */
-export const deleteImageKitPrivateKey = onCall({ cors: true, region: 'us-central1' }, async (request) => {
+export const setImageKitPrivateKey = onCall(CALLABLE_OPTIONS, async (request) => {
   ensureAdmin(request);
-  const integrationId =
-    typeof request.data?.integrationId === 'string' ? request.data.integrationId.trim() : '';
-  if (!integrationId) {
-    throw new HttpsError('invalid-argument', 'integrationId es obligatorio');
-  }
-
-  integrationSecretId(integrationId); // validates chars + normaliza formato
-
-  const projectId = process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT || app().options.projectId;
-  if (!projectId) {
-    throw new HttpsError('internal', 'No se pudo resolver el proyecto');
-  }
-
-  const db = getFirestore(app());
-  const docRef = db.doc(`${INTEGRATIONS_PATH}/${integrationId}`);
-  const snap = await docRef.get();
-  if (!snap.exists) {
-    throw new HttpsError('not-found', 'Integración no encontrada.');
-  }
-  const row = snap.data() as IntegrationSnap;
-  if (row.provider !== 'imagekit') {
-    throw new HttpsError('failed-precondition', 'Solo aplica a integraciones ImageKit');
-  }
-
-  const client = new SecretManagerServiceClient();
-  const name = secretResourceName(projectId, integrationId);
+  const id = readIntegrationId(request.data);
+  const privateKey = typeof request.data?.privateKey === 'string' ? request.data.privateKey.trim() : '';
+  if (!privateKey.startsWith('private_') || /\s/.test(privateKey)) throw new HttpsError('invalid-argument', 'Usa la private key completa de ImageKit (private_…), sin espacios.');
+  const { ref } = await integration(id);
+  await persistPrivateKey(new SecretManagerServiceClient(), resolveProjectId(), integrationSecretId(id), privateKey);
   try {
-    await client.deleteSecret({ name });
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e);
-    // Si ya no existe, igual continuamos para reflejar el estado en Firestore.
-    if (!msg.toLowerCase().includes('not found') && !msg.toLowerCase().includes('404')) {
-      throw new HttpsError('internal', `Secret Manager: ${msg}`);
-    }
+    await runCloudOperation('write-integration', () => ref.set({ hasPrivateKey: true, updatedAt: FieldValue.serverTimestamp() }, { merge: true }));
+  } catch (error) {
+    if (error instanceof HttpsError) throw new HttpsError(error.code, `La clave se guardó en Secret Manager, pero no se pudo actualizar el estado del panel. ${error.message}`, error.details);
+    throw error;
   }
-
-  await docRef.set(
-    {
-      hasPrivateKey: false,
-      updatedAt: FieldValue.serverTimestamp(),
-    },
-    { merge: true }
-  );
-
-  return { ok: true as const };
+  return { ok: true as const, backendRelease: IMAGEKIT_BACKEND_RELEASE };
 });
 
-/** Checks ImageKit credentials without uploading or changing media. */
-export const verifyImageKitIntegration = onCall({ cors: true, region: 'us-central1' }, async (request) => {
+export const deleteImageKitPrivateKey = onCall(CALLABLE_OPTIONS, async (request) => {
   ensureAdmin(request);
-  const integrationId = typeof request.data?.integrationId === 'string' ? request.data.integrationId.trim() : '';
-  integrationSecretId(integrationId);
-  const snap = await getFirestore(app()).doc(`${INTEGRATIONS_PATH}/${integrationId}`).get();
-  const row = snap.data() as IntegrationSnap | undefined;
-  if (!row || row.provider !== 'imagekit' || row.active === false) throw new HttpsError('failed-precondition', 'Guarda y activa la integración ImageKit antes de probarla.');
+  const id = readIntegrationId(request.data);
+  const { ref } = await integration(id);
+  await runCloudOperation('delete-secret', async () => {
+    try { await new SecretManagerServiceClient().deleteSecret({ name: `projects/${resolveProjectId()}/secrets/${integrationSecretId(id)}` }); }
+    catch (error) { if (![5, 404, 'NOT_FOUND'].includes(cloudCode(error) ?? '')) throw error; }
+  });
+  await runCloudOperation('write-integration', () => ref.set({ hasPrivateKey: false, updatedAt: FieldValue.serverTimestamp() }, { merge: true }));
+  return { ok: true as const, backendRelease: IMAGEKIT_BACKEND_RELEASE };
+});
+
+/** Real, read-only ImageKit credential check. Does not create test uploads. */
+export const verifyImageKitIntegration = onCall(CALLABLE_OPTIONS, async (request) => {
+  ensureAdmin(request);
+  const id = readIntegrationId(request.data);
+  const { row } = await integration(id);
+  if (row.active === false) throw new HttpsError('failed-precondition', 'Activa la integración antes de probarla.');
   if (!row.publicKey?.trim().startsWith('public_')) throw new HttpsError('failed-precondition', 'Configura la public key completa (public_…), del mismo par que la private key.');
   try { if (new URL(row.urlEndpoint || '').protocol !== 'https:') throw new Error('https'); }
   catch { throw new HttpsError('failed-precondition', 'Configura un URL endpoint válido con HTTPS.'); }
-  const privateKey = await readPrivateKey(resolveProjectId(), integrationId);
+  const privateKey = await readPrivateKey(resolveProjectId(), id);
   let response: Response;
   try {
     response = await fetch('https://api.imagekit.io/v1/files?limit=1', {
@@ -286,5 +115,5 @@ export const verifyImageKitIntegration = onCall({ cors: true, region: 'us-centra
   if (response.status === 401 || response.status === 403) throw new HttpsError('failed-precondition', 'ImageKit rechazó la clave o sus permisos. Revisa Developer options → API keys: clave activa y Media Read and write. Al rotarla, actualiza public key y private key del mismo par.');
   if (response.status === 429) throw new HttpsError('resource-exhausted', 'Límite de consultas de ImageKit alcanzado. Espera antes de repetir.');
   if (!response.ok) throw new HttpsError('unavailable', `ImageKit devolvió HTTP ${response.status}. Reintenta más tarde.`);
-  return { ok: true as const, scope: 'media-read' as const };
+  return { ok: true as const, scope: 'media-read' as const, backendRelease: IMAGEKIT_BACKEND_RELEASE };
 });

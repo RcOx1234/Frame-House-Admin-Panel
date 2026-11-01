@@ -74,6 +74,8 @@ type IntegrationEditModalProps = {
   setPrivateKeyEditingId: (id: string | null) => void;
   testBusyId: string | null;
   testOkId: string | null;
+  operationError: string | null;
+  operationFeedback: string | null;
 };
 
 function IntegrationEditModal({
@@ -94,6 +96,8 @@ function IntegrationEditModal({
   setPrivateKeyEditingId,
   testBusyId,
   testOkId,
+  operationError,
+  operationFeedback,
 }: IntegrationEditModalProps) {
   useLockBodyScrollMobile(true);
 
@@ -136,6 +140,8 @@ function IntegrationEditModal({
         </div>
 
         <div className="flex-1 space-y-4 overflow-y-auto p-5 text-sm">
+          {operationError ? <div role="alert" className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-200">{operationError}</div> : null}
+          {operationFeedback ? <p role="status" className="text-sm text-emerald-700 dark:text-emerald-400">{operationFeedback}</p> : null}
           <input
             value={row.name}
             onChange={(e) => patchIntegration(id, { name: e.target.value })}
@@ -281,7 +287,7 @@ function IntegrationEditModal({
                         type="button"
                         disabled={privateKeySavingId === id || !persistedToFirestore}
                         onClick={() => void savePrivateKeyFor(id)}
-                        className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-surface py-2 text-xs font-semibold text-[#fdfcfa] transition hover:bg-muted disabled:opacity-50 dark:bg-canvas dark:text-muted dark:hover:bg-surface sm:w-auto sm:px-4"
+                        className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-brand py-2 text-xs font-semibold text-white transition hover:bg-brand/90 disabled:opacity-50 sm:w-auto sm:px-4"
                       >
                         {privateKeySavingId === id ? (
                           <>
@@ -769,7 +775,7 @@ export function ConfiguracionesSection({ reloadSignal = 0 }: Props) {
                   <button
                     type="button"
                     className="panel-btn-secondary w-full py-2 text-xs"
-                    onClick={() => setDetailIntegrationId(row.id)}
+                    onClick={() => { setError(null); setFeedback(null); setDetailIntegrationId(row.id); }}
                   >
                     Ver detalles y editar
                   </button>
@@ -803,6 +809,8 @@ export function ConfiguracionesSection({ reloadSignal = 0 }: Props) {
             setPrivateKeyEditingId={setPrivateKeyEditingId}
             testBusyId={testBusyId}
             testOkId={testOkId}
+            operationError={error}
+            operationFeedback={feedback}
           />
         ) : null}
 

@@ -1,3 +1,4 @@
+import { FileSpreadsheet } from 'lucide-react';
 import { StudioNav } from '../components/StudioNav';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { CotizacionDoc, PanelRole, PlanFilterValue, SortOrder } from '../types/cotizacion';
@@ -10,7 +11,6 @@ import { StatsCard } from '../components/StatsCard';
 import { CotizacionesTable } from '../components/CotizacionesTable';
 import { DetailsModal } from '../components/DetailsModal';
 import { CotizacionesGrid } from '../components/CotizacionesGrid';
-import { SidePanel } from '../components/SidePanel';
 import { SessionExpiryBanner } from '../components/SessionExpiryBanner';
 import { GallerySection } from '../components/GallerySection';
 import { SessionsSection } from '../components/SessionsSection';
@@ -53,26 +53,6 @@ function IconButton({
     >
       {children}
     </button>
-  );
-}
-
-/** Panel lateral a la derecha: contenido + franja (mismo patrón que el SidePanel). */
-function IconSidebarTools() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="h-5 w-5"
-      aria-hidden="true"
-    >
-      <rect x="3" y="4" width="18" height="16" rx="2" />
-      <line x1="15" y1="4" x2="15" y2="20" />
-    </svg>
   );
 }
 
@@ -139,26 +119,6 @@ function IconRefresh() {
   );
 }
 
-function IconDownload() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="h-4 w-4"
-      aria-hidden="true"
-    >
-      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-      <path d="M7 10l5 5 5-5" />
-      <path d="M12 15V3" />
-    </svg>
-  );
-}
-
 export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContext }: Props) {
   const [rows, setRows] = useState<CotizacionDoc[]>([]);
   const [loading, setLoading] = useState(false);
@@ -178,7 +138,7 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContex
     return saved === 'list' ? 'list' : 'cards';
   });
   const [focused, setFocused] = useState<boolean>(() => localStorage.getItem('fh_focused') === '1');
-  const [sideOpen, setSideOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [section, setSection] = useState<'registros' | 'galeria' | 'sesiones' | 'configuraciones'>(() => {
     const saved = localStorage.getItem('fh_admin_section');
     if (saved === 'galeria') return 'galeria';
@@ -264,12 +224,19 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContex
     }
   }
 
-  function handleExport() {
-    const stamp = new Date().toISOString().slice(0, 10);
-    void (async () => {
+  async function handleExport() {
+    if (exporting) return;
+    setExporting(true);
+    setError(null);
+    try {
+      const stamp = new Date().toISOString().slice(0, 10);
       const { exportCotizacionesToXlsx } = await import('../utils/exportExcel');
       await exportCotizacionesToXlsx(`cotizaciones_frame_house_${stamp}.xlsx`, filtered);
-    })();
+    } catch {
+      setError('No se pudo exportar el archivo Excel. Vuelve a intentarlo.');
+    } finally {
+      setExporting(false);
+    }
   }
 
   function toggleView() {
@@ -356,7 +323,7 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContex
   return (
     <div className="panel-shell studio-shell pb-12">
       <a className="skip-link" href="#studio-content">Ir al contenido</a>
-      <StudioNav section={section} role={role} onNavigate={openSection} onLogout={() => onLogout()} onTools={() => setSideOpen(true)} />
+      <StudioNav section={section} role={role} onNavigate={openSection} onLogout={() => onLogout()} />
       <header className="panel-header-bar studio-header">
         <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -371,13 +338,6 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContex
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <IconButton
-              onClick={() => setSideOpen(true)}
-              title="Panel lateral · herramientas"
-              ariaLabel="Abrir panel lateral"
-            >
-              <IconSidebarTools />
-            </IconButton>
             {section !== 'configuraciones' ? (
               <IconButton
                 onClick={toggleView}
@@ -440,14 +400,18 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContex
               <IconRefresh />
             </IconButton>
             {section === 'registros' ? (
-              <IconButton
-                onClick={handleExport}
-                disabled={!filtered.length}
-                title="Exportar"
-                ariaLabel="Exportar registros"
+              <button
+                type="button"
+                onClick={() => void handleExport()}
+                disabled={!filtered.length || exporting}
+                title="Descargar registros filtrados en Excel (.xlsx)"
+                aria-label="Exportar registros a Excel"
+                aria-busy={exporting}
+                className="panel-btn-secondary export-excel-button inline-flex items-center gap-2"
               >
-                <IconDownload />
-              </IconButton>
+                <FileSpreadsheet size={17} aria-hidden="true" />
+                <span>{exporting ? 'Exportando…' : 'Exportar Excel'}</span>
+              </button>
             ) : null}
             <button type="button" onClick={() => onLogout()} className="panel-btn-secondary text-muted dark:text-muted">
               Salir
@@ -599,46 +563,7 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContex
         }}
         onClose={() => setDetailsRow(null)}
       />
-      <SidePanel
-        open={sideOpen}
-        role={role}
-        viewMode={
-          section === 'registros'
-            ? viewMode
-            : section === 'sesiones'
-              ? sessionsViewMode
-              : section === 'configuraciones'
-                ? 'cards'
-                : galleryViewMode
-        }
-        focused={focused}
-        section={section}
-        onClose={() => setSideOpen(false)}
-        onToggleFocused={toggleFocused}
-        onToggleView={toggleView}
-        onRefresh={reloadCurrentSection}
-        onOpenGallery={() => {
-          openSection('galeria');
-          setSideOpen(false);
-        }}
-        onOpenSessions={() => {
-          openSection('sesiones');
-          setSideOpen(false);
-        }}
-        onOpenConfig={() => {
-          openSection('configuraciones');
-          setSideOpen(false);
-        }}
-        onOpenRegistros={() => {
-          openSection('registros');
-          setSideOpen(false);
-        }}
-        sessions={sessions}
-        sessionsLoading={sessionsLoading}
-        sessionsError={sessionsError}
-        onRefreshSessions={() => void loadSessions()}
-        sessionContext={sessionContext}
-      />
+
     </div>
   );
 }

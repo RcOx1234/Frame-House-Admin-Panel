@@ -83,3 +83,12 @@ This was not executed: the connected tools provide Vercel/GitHub access, but no 
 - `tests/ui.html`
 - `tests/ui.tsx`
 - `vite.qa.config.ts`
+
+## Ajustes solicitados después de revisar la vista previa
+
+- Eliminados el componente SidePanel y sus dos accesos (botón superior y Herramientas). Los controles de vista, modo registros, actualizar, exportar y salir permanecen en el encabezado.
+- Navegación nueva: solo nombres e iconos; perfil de administrador colocado encima del enlace al sitio, con margen inferior y bloque propio.
+- Exportación Excel identificada con texto e icono de hoja, estado ocupado y manejo de errores; mismo contenido y formato .xlsx.
+- ImageKit: errores de creación, versión, lectura, borrado y Firestore se traducen a diagnósticos por etapa; errores y confirmaciones visibles en el modal. Rotación con ALREADY_EXISTS por código numérico. Sin registrar ni devolver excepciones crudas/keys.
+- Firebase predeploy compila antes de publicar; runtime Node.js 22. Guía completa: docs/IMAGEKIT-DEPLOY.md.
+- No se desplegó Firebase ni se cambiaron IAM, APIs o secretos reales. El diagnóstico definitivo de la infraestructura requiere el despliegue y los logs del proyecto.

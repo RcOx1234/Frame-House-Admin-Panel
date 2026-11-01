@@ -9,7 +9,7 @@ export const deleteProject=async()=>{};
 export const seedProjectsToFirestore=async()=>{};
 export const fetchGeneralSettings=async()=>DEFAULT_PANEL_SETTINGS;
 export const subscribeGeneralSettings=(cb:any)=>{cb(DEFAULT_PANEL_SETTINGS);return ()=>{}};
-export const listIntegrations=async()=>[];
+export const listIntegrations=async()=>[{id:'imagekit-test',provider:'imagekit',name:'ImageKit de prueba',active:true,isDefault:false,publicKey:'public_test',urlEndpoint:'https://ik.imagekit.io/test',hasPrivateKey:false}];
 export const saveGeneralSettings=async()=>{};
 export const upsertIntegration=async()=>{};
 export const deleteIntegration=async()=>{};

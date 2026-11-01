@@ -123,3 +123,35 @@ test('Remotion artwork loads and its frame geometry moves',async({page})=>{
   const before = await frame.getAttribute('style');
   await expect.poll(()=>frame.getAttribute('style')).not.toBe(before);
 });
+
+test('single navigation has no tools/subtitles, account stays inset, and Excel still downloads',async({page})=>{
+  await page.setViewportSize({width:1440,height:900});
+  await page.goto('/tests/ui.html');
+  await expect(page.getByRole('button',{name:'Abrir panel lateral'})).toHaveCount(0);
+  await expect(page.getByRole('button',{name:'Herramientas'})).toHaveCount(0);
+  await expect(page.locator('.studio-nav nav small')).toHaveCount(0);
+  for(const name of ['Registros','Galería','Sesiones','Configuraciones']) await expect(page.getByRole('navigation').getByRole('button',{name,exact:true})).toBeVisible();
+  const profile=await page.locator('.studio-profile').boundingBox();
+  expect(profile.y+profile.height).toBeLessThan(900-60);
+  const downloadPromise=page.waitForEvent('download');
+  await page.getByRole('button',{name:'Exportar registros a Excel'}).click();
+  expect((await downloadPromise).suggestedFilename()).toMatch(/^cotizaciones_frame_house_.*\.xlsx$/);
+  await page.screenshot({path:'/tmp/fh-followup-desktop.png',fullPage:true});
+  await page.setViewportSize({width:430,height:932});
+  await expect(page.getByRole('navigation').getByRole('button',{name:'Galería',exact:true})).toBeVisible();
+  await page.screenshot({path:'/tmp/fh-followup-mobile.png',fullPage:true});
+});
+
+test('an ImageKit save failure is explained inside its open modal',async({page})=>{
+  await page.route('https://us-central1-frame-house-datos.cloudfunctions.net/setImageKitPrivateKey',async route=>{
+    await route.fulfill({status:500,contentType:'application/json',body:JSON.stringify({error:{status:'INTERNAL',message:'internal'}})});
+  });
+  await page.goto('/tests/ui.html');
+  await page.getByRole('navigation').getByRole('button',{name:'Configuraciones',exact:true}).click();
+  await page.getByRole('button',{name:'Ver detalles y editar'}).click();
+  const dialog=page.getByRole('dialog',{name:'Editar integración'});
+  await dialog.getByPlaceholder('Pegar private key…',{exact:true}).fill('private_fake');
+  await dialog.getByRole('button',{name:'Guardar private key',exact:true}).click();
+  await expect(dialog.getByRole('alert')).toContainText('cuatro Functions');
+  await expect(dialog.getByRole('alert')).not.toContainText('private_fake');
+});
