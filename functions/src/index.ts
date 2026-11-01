@@ -128,6 +128,9 @@ export const setImageKitPrivateKey = onCall({ cors: true, region: 'us-central1' 
     throw new HttpsError('invalid-argument', 'integrationId y privateKey son obligatorios');
   }
 
+  if (!privateKey.startsWith('private_') || /\s/.test(privateKey)) {
+    throw new HttpsError('invalid-argument', 'Usa la private key completa de ImageKit (private_…), sin espacios.');
+  }
   const secretId = integrationSecretId(integrationId); // validates chars + normaliza formato
   console.log('Normalized secret:', secretId);
   const projectId = resolveProjectId();
@@ -259,4 +262,29 @@ export const deleteImageKitPrivateKey = onCall({ cors: true, region: 'us-central
   );
 
   return { ok: true as const };
+});
+
+/** Checks ImageKit credentials without uploading or changing media. */
+export const verifyImageKitIntegration = onCall({ cors: true, region: 'us-central1' }, async (request) => {
+  ensureAdmin(request);
+  const integrationId = typeof request.data?.integrationId === 'string' ? request.data.integrationId.trim() : '';
+  integrationSecretId(integrationId);
+  const snap = await getFirestore(app()).doc(`${INTEGRATIONS_PATH}/${integrationId}`).get();
+  const row = snap.data() as IntegrationSnap | undefined;
+  if (!row || row.provider !== 'imagekit' || row.active === false) throw new HttpsError('failed-precondition', 'Guarda y activa la integración ImageKit antes de probarla.');
+  if (!row.publicKey?.trim().startsWith('public_')) throw new HttpsError('failed-precondition', 'Configura la public key completa (public_…), del mismo par que la private key.');
+  try { if (new URL(row.urlEndpoint || '').protocol !== 'https:') throw new Error('https'); }
+  catch { throw new HttpsError('failed-precondition', 'Configura un URL endpoint válido con HTTPS.'); }
+  const privateKey = await readPrivateKey(resolveProjectId(), integrationId);
+  let response: Response;
+  try {
+    response = await fetch('https://api.imagekit.io/v1/files?limit=1', {
+      headers: { Authorization: `Basic ${Buffer.from(privateKey + ':').toString('base64')}` },
+      signal: AbortSignal.timeout(10000),
+    });
+  } catch { throw new HttpsError('unavailable', 'ImageKit no respondió. Reintenta en unos minutos.'); }
+  if (response.status === 401 || response.status === 403) throw new HttpsError('failed-precondition', 'ImageKit rechazó la clave o sus permisos. Revisa Developer options → API keys: clave activa y Media Read and write. Al rotarla, actualiza public key y private key del mismo par.');
+  if (response.status === 429) throw new HttpsError('resource-exhausted', 'Límite de consultas de ImageKit alcanzado. Espera antes de repetir.');
+  if (!response.ok) throw new HttpsError('unavailable', `ImageKit devolvió HTTP ${response.status}. Reintenta más tarde.`);
+  return { ok: true as const, scope: 'media-read' as const };
 });

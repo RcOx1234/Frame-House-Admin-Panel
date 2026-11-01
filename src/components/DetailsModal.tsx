@@ -1,3 +1,4 @@
+import { useDialogFocus } from '../hooks/useDialogFocus';
 import { useEffect, useState } from 'react';
 import { useLockBodyScrollMobile } from '../hooks/useLockBodyScrollMobile';
 import type { CotizacionDoc } from '../types/cotizacion';
@@ -23,6 +24,7 @@ export function DetailsModal({ open, row, role, onClose, onDelete, busyId }: Pro
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
 
   useLockBodyScrollMobile(open && Boolean(row));
+  const dialogRef = useDialogFocus(open && Boolean(row));
 
   useEffect(() => {
     if (!open) return;
@@ -67,18 +69,21 @@ export function DetailsModal({ open, row, role, onClose, onDelete, busyId }: Pro
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+      className="panel-modal-overlay"
+      ref={dialogRef}
+      tabIndex={-1}
+      aria-label="Detalle de cotización"
       role="dialog"
       aria-modal="true"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="w-full max-w-2xl overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-950 shadow-2xl">
-        <div className="flex items-start justify-between gap-4 border-b border-neutral-800 px-6 py-4">
+      <div className="panel-modal-panel w-full max-w-2xl overflow-hidden rounded-2xl border border-line bg-canvas shadow-2xl">
+        <div className="flex items-start justify-between gap-4 border-b border-line px-6 py-4">
           <div>
-            <h2 className="text-base font-semibold text-neutral-100">Detalle de cotización</h2>
-            <p className="mt-1 text-xs font-mono text-neutral-500" title={row.id}>
+            <h2 className="text-base font-semibold text-ink">Detalle de cotización</h2>
+            <p className="mt-1 text-xs font-mono text-muted" title={row.id}>
               ID: {row.id}
             </p>
           </div>
@@ -86,7 +91,7 @@ export function DetailsModal({ open, row, role, onClose, onDelete, busyId }: Pro
             <button
               type="button"
               onClick={() => void handleCopyAll()}
-              className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-1.5 text-sm font-medium text-neutral-200 transition hover:border-neutral-600 hover:bg-neutral-800"
+              className="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm font-medium text-ink transition hover:border-line hover:bg-line"
             >
               Copiar datos
             </button>
@@ -103,7 +108,7 @@ export function DetailsModal({ open, row, role, onClose, onDelete, busyId }: Pro
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg border border-neutral-700 px-3 py-1.5 text-sm font-medium text-neutral-300 transition hover:border-neutral-600 hover:text-neutral-100"
+              className="rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-ink transition hover:border-line hover:text-ink"
             >
               Cerrar
             </button>
@@ -111,40 +116,40 @@ export function DetailsModal({ open, row, role, onClose, onDelete, busyId }: Pro
         </div>
 
         <div className="max-h-[75vh] overflow-y-auto px-6 py-5">
-          {copyFeedback ? <p className="mb-4 text-sm text-amber-400/90">{copyFeedback}</p> : null}
+          {copyFeedback ? <p className="mb-4 text-sm text-brand/90">{copyFeedback}</p> : null}
           <div className="grid gap-4 sm:grid-cols-2">
-            <section className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-4">
-              <h3 className="text-xs font-medium uppercase tracking-wide text-neutral-500">Cliente</h3>
+            <section className="rounded-xl border border-line bg-surface/40 p-4">
+              <h3 className="text-xs font-medium uppercase tracking-wide text-muted">Cliente</h3>
               <div className="mt-3 space-y-2 text-sm">
-                <div className="text-neutral-200">
-                  <span className="text-neutral-500">Nombre:</span> {row.cliente.nombre || '—'}
+                <div className="text-ink">
+                  <span className="text-muted">Nombre:</span> {row.cliente.nombre || '—'}
                 </div>
-                <div className="text-neutral-200">
-                  <span className="text-neutral-500">Email:</span> {row.cliente.email || '—'}
+                <div className="text-ink">
+                  <span className="text-muted">Email:</span> {row.cliente.email || '—'}
                 </div>
-                <div className="text-neutral-200">
-                  <span className="text-neutral-500">Empresa:</span> {row.cliente.empresa || '—'}
+                <div className="text-ink">
+                  <span className="text-muted">Empresa:</span> {row.cliente.empresa || '—'}
                 </div>
               </div>
             </section>
 
-            <section className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-4">
-              <h3 className="text-xs font-medium uppercase tracking-wide text-neutral-500">Plan</h3>
+            <section className="rounded-xl border border-line bg-surface/40 p-4">
+              <h3 className="text-xs font-medium uppercase tracking-wide text-muted">Plan</h3>
               <div className="mt-3 space-y-2 text-sm">
-                <div className="text-neutral-200">
-                  <span className="text-neutral-500">Nombre:</span> {row.plan.nombre || row.plan.valor || '—'}
+                <div className="text-ink">
+                  <span className="text-muted">Nombre:</span> {row.plan.nombre || row.plan.valor || '—'}
                 </div>
-                <div className="text-neutral-200">
-                  <span className="text-neutral-500">Precio:</span> {formatUsd(row.plan.precioUsd)}
+                <div className="text-ink">
+                  <span className="text-muted">Precio:</span> {formatUsd(row.plan.precioUsd)}
                 </div>
-                <div className="text-neutral-200">
-                  <span className="text-neutral-500">Etiqueta:</span> {row.plan.etiquetaLista || '—'}
+                <div className="text-ink">
+                  <span className="text-muted">Etiqueta:</span> {row.plan.etiquetaLista || '—'}
                 </div>
               </div>
             </section>
 
-            <section className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-4 sm:col-span-2">
-              <h3 className="text-xs font-medium uppercase tracking-wide text-neutral-500">
+            <section className="rounded-xl border border-line bg-surface/40 p-4 sm:col-span-2">
+              <h3 className="text-xs font-medium uppercase tracking-wide text-muted">
                 Productos adicionales
               </h3>
               <div className="mt-3">
@@ -152,42 +157,42 @@ export function DetailsModal({ open, row, role, onClose, onDelete, busyId }: Pro
                   <ul className="space-y-2 text-sm">
                     {adicionales.map((p) => (
                       <li key={p.id} className="flex items-center justify-between gap-4">
-                        <span className="text-neutral-200">{p.nombre}</span>
-                        <span className="tabular-nums text-neutral-400">{formatUsd(p.precioUsd)}</span>
+                        <span className="text-ink">{p.nombre}</span>
+                        <span className="tabular-nums text-muted">{formatUsd(p.precioUsd)}</span>
                       </li>
                     ))}
                   </ul>
                 ) : (
-                  <p className="text-sm text-neutral-500">Ninguno</p>
+                  <p className="text-sm text-muted">Ninguno</p>
                 )}
               </div>
             </section>
 
-            <section className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-4">
-              <h3 className="text-xs font-medium uppercase tracking-wide text-neutral-500">Totales</h3>
+            <section className="rounded-xl border border-line bg-surface/40 p-4">
+              <h3 className="text-xs font-medium uppercase tracking-wide text-muted">Totales</h3>
               <div className="mt-3 space-y-2 text-sm">
                 <div className="flex items-center justify-between gap-4">
-                  <span className="text-neutral-500">Subtotal plan</span>
-                  <span className="tabular-nums text-neutral-200">{formatUsd(row.totales.subtotalPlanUsd)}</span>
+                  <span className="text-muted">Subtotal plan</span>
+                  <span className="tabular-nums text-ink">{formatUsd(row.totales.subtotalPlanUsd)}</span>
                 </div>
                 <div className="flex items-center justify-between gap-4">
-                  <span className="text-neutral-500">Subtotal adicionales</span>
-                  <span className="tabular-nums text-neutral-200">
+                  <span className="text-muted">Subtotal adicionales</span>
+                  <span className="tabular-nums text-ink">
                     {formatUsd(row.totales.subtotalAdicionalesUsd)}
                   </span>
                 </div>
-                <div className="flex items-center justify-between gap-4 border-t border-neutral-800 pt-2">
-                  <span className="text-neutral-400">Total</span>
-                  <span className="tabular-nums font-semibold text-neutral-100">
+                <div className="flex items-center justify-between gap-4 border-t border-line pt-2">
+                  <span className="text-muted">Total</span>
+                  <span className="tabular-nums font-semibold text-ink">
                     {formatUsd(row.totales.totalEstimadoUsd)}
                   </span>
                 </div>
               </div>
             </section>
 
-            <section className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-4">
-              <h3 className="text-xs font-medium uppercase tracking-wide text-neutral-500">Fecha</h3>
-              <p className="mt-3 text-sm text-neutral-200">{formatDateEs(row.creadoEn)}</p>
+            <section className="rounded-xl border border-line bg-surface/40 p-4">
+              <h3 className="text-xs font-medium uppercase tracking-wide text-muted">Fecha</h3>
+              <p className="mt-3 text-sm text-ink">{formatDateEs(row.creadoEn)}</p>
             </section>
           </div>
         </div>

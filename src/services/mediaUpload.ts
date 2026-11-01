@@ -95,6 +95,12 @@ export async function uploadToImageKit(
   }
 ): Promise<string> {
   const { publicKey, token, expire, signature } = opts.auth;
+  if (!publicKey?.startsWith('public_') || !token || !signature || !Number.isFinite(expire)) {
+    throw new Error('Firma ImageKit incompleta. Revisa la integración y vuelve a intentar.');
+  }
+  if (expire <= Math.floor(Date.now() / 1000)) {
+    throw new Error('La firma de ImageKit venció. Vuelve a seleccionar el archivo.');
+  }
   const fd = new FormData();
   fd.append('file', file);
   fd.append('fileName', file.name);
@@ -110,7 +116,10 @@ export async function uploadToImageKit(
   });
   const data = (await res.json()) as { url?: string; message?: string };
   if (!res.ok) {
-    throw new Error(data.message || 'Error al subir a ImageKit');
+    const advice = res.status === 401 || res.status === 403
+      ? ' Revisa claves activas del mismo par, permisos Media Read and write y límites de la cuenta.'
+      : res.status === 429 ? ' Espera unos minutos antes de volver a intentar.' : '';
+    throw new Error((data.message || 'Error al subir a ImageKit') + advice);
   }
   if (!data.url) throw new Error('ImageKit no devolvió URL');
   return data.url;
@@ -122,5 +131,17 @@ export function isValidHttpUrl(text: string): boolean {
     return u.protocol === 'http:' || u.protocol === 'https:';
   } catch {
     return false;
+  }
+}
+
+/** Read-only provider check; never changes media. */
+export async function verifyImageKitConnection(integrationId: string): Promise<void> {
+  const fn = httpsCallable<{ integrationId: string }, { ok: boolean }>(functions(), 'verifyImageKitIntegration');
+  try { await fn({ integrationId }); }
+  catch (error) {
+    if ((error as { code?: string })?.code === 'functions/not-found') {
+      throw new Error('La comprobación de ImageKit requiere actualizar las funciones del panel en Firebase. Las subidas existentes conservan su método de firma.');
+    }
+    throw formatCallableError(error, 'No se pudo comprobar la conexión con ImageKit');
   }
 }

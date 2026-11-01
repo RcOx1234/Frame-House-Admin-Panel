@@ -27,7 +27,7 @@ type Props = {
 /** Mini spinner para estado de subida */
 function Spinner({ className = 'h-4 w-4' }: { className?: string }) {
   return (
-    <svg className={`${className} animate-spin text-amber-600`} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <svg className={`${className} animate-spin text-brand`} viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
       <path
         className="opacity-75"
@@ -137,10 +137,10 @@ export function MediaAssetInput({
 
   return (
     <div
-      className={`panel-card-muted ${box} min-w-0 max-w-full overflow-hidden transition hover:border-neutral-300 dark:hover:border-neutral-700`}
+      className={`panel-card-muted ${box} min-w-0 max-w-full overflow-hidden transition hover:border-line dark:hover:border-line`}
     >
       <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
-        <span className="min-w-0 shrink text-xs font-semibold uppercase tracking-wide text-neutral-600 dark:text-neutral-400">
+        <span className="min-w-0 shrink text-xs font-semibold uppercase tracking-wide text-muted dark:text-muted">
           {label}
         </span>
         <select
@@ -207,7 +207,7 @@ export function MediaAssetInput({
       )}
 
       {value && showCurrentUrlFooter ? (
-        <p className="break-all text-xs text-neutral-500 dark:text-neutral-500" title={value}>
+        <p className="break-all text-xs text-muted dark:text-muted" title={value}>
           URL: {value}
         </p>
       ) : null}

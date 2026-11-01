@@ -6,15 +6,20 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:ui": "playwright test"
   },
   "dependencies": {
+    "@remotion/player": "4.0.534",
     "exceljs": "^4.4.0",
     "firebase": "^11.10.0",
+    "lucide-react": "^1.66.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "remotion": "4.0.534"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.4",
     "@vitejs/plugin-react": "^4.3.4",

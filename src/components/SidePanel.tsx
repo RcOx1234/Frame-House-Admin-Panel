@@ -32,8 +32,8 @@ function navChipClass(active: boolean): string {
   return [
     'inline-flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition duration-200',
     active
-      ? 'border-amber-500/40 bg-amber-100/80 text-amber-950 dark:border-amber-500/35 dark:bg-amber-950/40 dark:text-amber-200'
-      : 'border-neutral-200 bg-neutral-50 text-neutral-700 hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-900/80 dark:text-neutral-300 dark:hover:bg-neutral-800',
+      ? 'border-brand/40 bg-brandsoft/80 text-brand dark:border-brand/35 dark:bg-brandsoft/40 dark:text-brand'
+      : 'border-line bg-canvas text-muted hover:bg-canvas dark:border-line dark:bg-surface/80 dark:text-ink dark:hover:bg-line',
   ].join(' ');
 }
 
@@ -117,13 +117,13 @@ export function SidePanel({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <aside className="absolute right-0 top-0 h-full w-full max-w-md overflow-y-auto border-l border-neutral-200 bg-white shadow-2xl dark:border-neutral-800 dark:bg-neutral-950">
-        <div className="flex items-start justify-between gap-4 border-b border-neutral-200 px-6 py-4 dark:border-neutral-800">
+      <aside className="absolute right-0 top-0 h-full w-full max-w-md overflow-y-auto border-l border-line bg-surface shadow-2xl dark:border-line dark:bg-canvas">
+        <div className="flex items-start justify-between gap-4 border-b border-line px-6 py-4 dark:border-line">
           <div>
-            <h2 className="text-base font-semibold text-neutral-900 dark:text-neutral-100">Herramientas</h2>
-            <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-500">
+            <h2 className="text-base font-semibold text-ink dark:text-ink">Herramientas</h2>
+            <p className="mt-1 text-sm text-muted dark:text-muted">
               Sesión:{' '}
-              <span className="text-neutral-800 dark:text-neutral-300">
+              <span className="text-ink dark:text-ink">
                 {role === 'admin' ? 'Administrador' : 'Invitado (solo lectura)'}
               </span>
             </p>
@@ -199,18 +199,18 @@ export function SidePanel({
           </section>
 
           {role === 'admin' ? (
-            <section className="space-y-3 rounded-2xl border border-neutral-800 bg-neutral-900/30 p-4">
+            <section className="space-y-3 rounded-2xl border border-line bg-surface/30 p-4">
               <SectionTitle>Resumen de sesiones</SectionTitle>
-              <p className="text-sm text-neutral-400">
+              <p className="text-sm text-muted">
                 Tu sesión actual y las 2 sesiones más recientes.
               </p>
-              <p className="text-xs text-neutral-500">Total sesiones: {sessions.length}</p>
+              <p className="text-xs text-muted">Total sesiones: {sessions.length}</p>
 
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
                   onClick={onRefreshSessions}
-                  className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm font-medium text-neutral-200 transition hover:bg-neutral-800 disabled:opacity-60"
+                  className="rounded-lg border border-line bg-surface px-3 py-2 text-sm font-medium text-ink transition hover:bg-line disabled:opacity-60"
                   disabled={sessionsLoading}
                 >
                   {sessionsLoading ? 'Cargando…' : 'Refrescar sesiones'}
@@ -227,24 +227,24 @@ export function SidePanel({
                     .filter((s) => !(s.uid === sessionContext.uid && s.deviceId === sessionContext.deviceId))
                     .slice(0, 2);
                   const list = [...recentOthers, current].filter(Boolean) as SessionDoc[];
-                  if (!list.length) return <p className="text-sm text-neutral-500">Aún no hay sesiones cargadas.</p>;
+                  if (!list.length) return <p className="text-sm text-muted">Aún no hay sesiones cargadas.</p>;
                   return list.map((s, idx) => {
                     const statusLabel = s.blocked ? 'Bloqueada' : s.forceLogout ? 'Cerrada' : s.isActive ? 'Activa' : 'Inactiva';
                     const isSelf = s.uid === sessionContext.uid && s.deviceId === sessionContext.deviceId;
                     const isAdminSession = s.role === 'admin';
                     return (
-                      <div key={`${s.id}-${idx}`} className="rounded-lg border border-neutral-800 bg-neutral-950/50 p-2">
+                      <div key={`${s.id}-${idx}`} className="rounded-lg border border-line bg-canvas/50 p-2">
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
-                            <p className="truncate text-xs font-medium text-neutral-200">
+                            <p className="truncate text-xs font-medium text-ink">
                               {s.alias || s.email || s.deviceName || s.deviceId || '—'}
                             </p>
-                            <p className="mt-0.5 truncate text-[11px] text-neutral-500">
+                            <p className="mt-0.5 truncate text-[11px] text-muted">
                               {s.deviceName || s.deviceId} · {s.country || 'N/A'} · {s.city || 'N/A'}
                             </p>
-                            {isSelf ? <p className="mt-0.5 text-[11px] text-amber-300">Sesión actual</p> : null}
+                            {isSelf ? <p className="mt-0.5 text-[11px] text-brand">Sesión actual</p> : null}
                           </div>
-                          <span className="rounded-md border border-neutral-700 bg-neutral-900 px-1.5 py-0.5 text-[10px] text-neutral-300">
+                          <span className="rounded-md border border-line bg-surface px-1.5 py-0.5 text-[10px] text-ink">
                             {statusLabel}
                           </span>
                         </div>
@@ -259,7 +259,7 @@ export function SidePanel({
                                   onRefreshSessions();
                                 })();
                               }}
-                              className="rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1 text-[11px] text-neutral-200"
+                              className="rounded-md border border-line bg-surface px-2 py-1 text-[11px] text-ink"
                             >
                               Desbloquear
                             </button>
@@ -292,7 +292,7 @@ export function SidePanel({
                                   onRefreshSessions();
                                 })();
                               }}
-                              className="rounded-md border border-amber-500/30 bg-amber-950/30 px-2 py-1 text-[11px] text-amber-200 disabled:opacity-50"
+                              className="rounded-md border border-brand/30 bg-brandsoft/30 px-2 py-1 text-[11px] text-brand disabled:opacity-50"
                             >
                               Cerrar
                             </button>
@@ -312,7 +312,7 @@ export function SidePanel({
                                 onRefreshSessions();
                               })();
                             }}
-                            className="rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1 text-[11px] text-neutral-200 disabled:opacity-50"
+                            className="rounded-md border border-line bg-surface px-2 py-1 text-[11px] text-ink disabled:opacity-50"
                           >
                             Eliminar
                           </button>
@@ -325,7 +325,7 @@ export function SidePanel({
               <button
                 type="button"
                 onClick={onOpenSessions}
-                className="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm font-medium text-neutral-200 transition hover:bg-neutral-800"
+                className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm font-medium text-ink transition hover:bg-line"
               >
                 Ver más
               </button>

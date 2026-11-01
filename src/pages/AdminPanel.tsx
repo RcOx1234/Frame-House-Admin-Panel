@@ -1,3 +1,4 @@
+import { StudioNav } from '../components/StudioNav';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { CotizacionDoc, PanelRole, PlanFilterValue, SortOrder } from '../types/cotizacion';
 import { deleteCotizacion, fetchCotizaciones } from '../services/cotizaciones';
@@ -46,7 +47,7 @@ function IconButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-neutral-300 bg-white text-neutral-800 transition hover:bg-neutral-50 active:scale-[0.98] disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800"
+      className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-line bg-surface text-muted transition hover:bg-canvas active:scale-[0.98] disabled:opacity-50 dark:border-line dark:bg-surface dark:text-ink dark:hover:bg-line"
       aria-label={ariaLabel}
       title={title}
     >
@@ -353,16 +354,18 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContex
   }, [role, section]);
 
   return (
-    <div className="panel-shell pb-12">
-      <header className="panel-header-bar">
+    <div className="panel-shell studio-shell pb-12">
+      <a className="skip-link" href="#studio-content">Ir al contenido</a>
+      <StudioNav section={section} role={role} onNavigate={openSection} onLogout={() => onLogout()} onTools={() => setSideOpen(true)} />
+      <header className="panel-header-bar studio-header">
         <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
-              Panel de administrador de FRAME HOUSE
+            <h1 className="text-lg font-semibold text-muted dark:text-ink">
+              FRAME HOUSE <span className="header-divider">/</span> <span className="header-location">{section === 'registros' ? 'Registros' : section === 'galeria' ? 'Galería' : section === 'sesiones' ? 'Sesiones' : 'Configuraciones'}</span>
             </h1>
-            <p className="text-sm text-neutral-600 dark:text-neutral-500">
+            <p className="text-sm text-muted dark:text-muted">
               Sesión:{' '}
-              <span className="text-neutral-800 dark:text-neutral-300">
+              <span className="text-muted dark:text-ink">
                 {role === 'admin' ? 'Administrador' : 'Invitado (solo lectura)'}
               </span>
             </p>
@@ -422,7 +425,7 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContex
               <button
                 type="button"
                 onClick={toggleFocused}
-                className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm font-medium text-neutral-200 transition hover:bg-neutral-800"
+                className="rounded-lg border border-line bg-surface px-3 py-2 text-sm font-medium text-ink transition hover:bg-line"
                 title={focused ? 'Salir de modo registros' : 'Modo registros'}
               >
                 {focused ? 'Vista normal' : 'Modo registros'}
@@ -446,7 +449,7 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContex
                 <IconDownload />
               </IconButton>
             ) : null}
-            <button type="button" onClick={() => onLogout()} className="panel-btn-secondary text-neutral-700 dark:text-neutral-400">
+            <button type="button" onClick={() => onLogout()} className="panel-btn-secondary text-muted dark:text-muted">
               Salir
             </button>
           </div>
@@ -462,7 +465,13 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContex
         </div>
       ) : null}
 
-      <main className="mx-auto max-w-6xl space-y-6 px-4 pt-6">
+      <main id="studio-content" className="studio-content mx-auto max-w-6xl space-y-6 px-4 pt-6">
+        <div className="studio-intro" key={section}>
+          <div><p className="studio-eyebrow">ADMIN STUDIO <span>/ {section === 'registros' ? '01' : section === 'galeria' ? '02' : section === 'sesiones' ? '03' : '04'}</span></p>
+          <h2>{section === 'registros' ? 'Registros' : section === 'galeria' ? 'Galería' : section === 'sesiones' ? 'Sesiones' : 'Configuraciones'}<span>.</span></h2>
+          <p>{section === 'registros' ? 'Cada gran proyecto empieza con una conversación.' : section === 'galeria' ? 'El trabajo que define a Frame House.' : section === 'sesiones' ? 'Una vista clara de tus dispositivos y accesos.' : 'Tu espacio de trabajo, a tu manera.'}</p></div>
+          <span className="studio-section-number" aria-hidden="true">{section === 'registros' ? '01' : section === 'galeria' ? '02' : section === 'sesiones' ? '03' : '04'}</span>
+        </div>
         {section === 'registros' ? (
           <>
             {!focused ? (
@@ -473,10 +482,10 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContex
               </div>
             ) : null}
 
-            <div className="rounded-xl border border-neutral-800 bg-neutral-900/50 p-4">
+            <div className="rounded-xl border border-line bg-surface/50 p-4">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
                 <div className="flex-1">
-                  <label htmlFor="search" className="text-xs font-medium uppercase text-neutral-500">
+                  <label htmlFor="search" className="text-xs font-medium uppercase text-muted">
                     Búsqueda
                   </label>
                   <input
@@ -485,20 +494,20 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContex
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     placeholder="Empresa, nombre, email o plan…"
-                    className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2.5 text-sm text-neutral-100 outline-none ring-amber-500/0 focus:border-neutral-600 focus:ring-2 focus:ring-amber-500/25"
+                    className="mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2.5 text-sm text-ink outline-none ring-brand/0 focus:border-line focus:ring-2 focus:ring-brand/25"
                   />
                 </div>
                 {!focused ? (
                   <>
                     <div className="w-full lg:w-48">
-                      <label htmlFor="plan" className="text-xs font-medium uppercase text-neutral-500">
+                      <label htmlFor="plan" className="text-xs font-medium uppercase text-muted">
                         Plan
                       </label>
                       <select
                         id="plan"
                         value={planFilter}
                         onChange={(e) => setPlanFilter(e.target.value as PlanFilterValue)}
-                        className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2.5 text-sm text-neutral-100 outline-none focus:border-neutral-600 focus:ring-2 focus:ring-amber-500/25"
+                        className="mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2.5 text-sm text-ink outline-none focus:border-line focus:ring-2 focus:ring-brand/25"
                       >
                         {PLAN_OPTIONS.map((o) => (
                           <option key={o.value} value={o.value}>
@@ -508,14 +517,14 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContex
                       </select>
                     </div>
                     <div className="w-full lg:w-44">
-                      <label htmlFor="sort" className="text-xs font-medium uppercase text-neutral-500">
+                      <label htmlFor="sort" className="text-xs font-medium uppercase text-muted">
                         Orden
                       </label>
                       <select
                         id="sort"
                         value={sortOrder}
                         onChange={(e) => setSortOrder(e.target.value as SortOrder)}
-                        className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2.5 text-sm text-neutral-100 outline-none focus:border-neutral-600 focus:ring-2 focus:ring-amber-500/25"
+                        className="mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2.5 text-sm text-ink outline-none focus:border-line focus:ring-2 focus:ring-brand/25"
                       >
                         <option value="desc">Fecha · más recientes</option>
                         <option value="asc">Fecha · más antiguos</option>
@@ -524,7 +533,7 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContex
                   </>
                 ) : null}
               </div>
-              {copyFeedback ? <p className="mt-3 text-sm text-amber-400/90">{copyFeedback}</p> : null}
+              {copyFeedback ? <p className="mt-3 text-sm text-brand/90">{copyFeedback}</p> : null}
             </div>
 
             {error ? (
@@ -552,8 +561,8 @@ export function AdminPanel({ role, onLogout, sessionExpiryWarning, sessionContex
               />
             )}
 
-            <p className="text-center text-xs text-neutral-600">
-              ID de documento disponible en la exportación CSV · Actualización manual de lista
+            <p className="text-center text-xs text-muted">
+              ID de documento disponible en la exportación Excel · Actualización manual de lista
             </p>
           </>
         ) : section === 'galeria' ? (

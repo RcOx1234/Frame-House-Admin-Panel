@@ -388,7 +388,7 @@ export default function App() {
 
   if (!user || !role) {
     return (
-      <div className="panel-shell flex items-center justify-center px-4 py-12 max-md:h-[100dvh] max-md:min-h-0 max-md:overflow-hidden max-md:py-6">
+      <div className="panel-shell studio-login-shell">
         <LoginCard onSuccess={clearLoginAlerts} />
       </div>
     );

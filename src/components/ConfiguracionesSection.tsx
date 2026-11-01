@@ -18,7 +18,7 @@ import {
 import {
   saveImageKitPrivateKeyRemote,
   deleteImageKitPrivateKeyRemote,
-  requestImageKitUploadAuth,
+  verifyImageKitConnection,
 } from '../services/mediaUpload';
 import { useTheme } from '../context/ThemeContext';
 import {
@@ -41,7 +41,7 @@ function enforceSingleDefault(rows: IntegrationDoc[]): IntegrationDoc[] {
 
 function Spinner({ className = 'h-4 w-4' }: { className?: string }) {
   return (
-    <svg className={`${className} animate-spin text-neutral-500 dark:text-neutral-400`} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <svg className={`${className} animate-spin text-muted dark:text-muted`} viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
       <path
         className="opacity-75"
@@ -121,12 +121,12 @@ function IntegrationEditModal({
         className="panel-modal-panel flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden shadow-2xl"
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div className="flex items-start justify-between gap-3 border-b border-stone-200 px-5 py-4 dark:border-neutral-800">
+        <div className="flex items-start justify-between gap-3 border-b border-line px-5 py-4 dark:border-line">
           <div className="min-w-0">
-            <p id={`integration-edit-title-${id}`} className="text-base font-semibold text-stone-900 dark:text-neutral-100">
+            <p id={`integration-edit-title-${id}`} className="text-base font-semibold text-ink dark:text-ink">
               Editar integración
             </p>
-            <p className="mt-1 truncate text-sm text-stone-600 dark:text-neutral-400">
+            <p className="mt-1 truncate text-sm text-muted dark:text-muted">
               {row.name || (row.provider === 'cloudinary' ? 'Cloudinary' : 'ImageKit')}
             </p>
           </div>
@@ -143,7 +143,7 @@ function IntegrationEditModal({
             className="panel-input w-full font-medium"
           />
 
-          <label className="inline-flex items-center gap-2 text-xs text-stone-600 dark:text-neutral-400">
+          <label className="inline-flex items-center gap-2 text-xs text-muted dark:text-muted">
             <input
               type="checkbox"
               checked={row.active}
@@ -157,7 +157,7 @@ function IntegrationEditModal({
               type="button"
               disabled={!row.active}
               onClick={() => useAsDefault(id)}
-              className="rounded-lg border border-stone-200 bg-[#fffefb] px-3 py-1.5 text-xs font-medium transition hover:bg-stone-100 disabled:opacity-40 dark:border-neutral-700 dark:bg-neutral-900 dark:hover:bg-neutral-800"
+              className="rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-medium transition hover:bg-canvas disabled:opacity-40 dark:border-line dark:bg-surface dark:hover:bg-line"
             >
               Usar como predeterminada
             </button>
@@ -166,7 +166,7 @@ function IntegrationEditModal({
                 type="button"
                 disabled={testBusyId === id || !row.active || !row.hasPrivateKey || !persistedToFirestore}
                 onClick={() => void testConnection(id)}
-                className="inline-flex items-center gap-2 rounded-lg border border-stone-200 bg-[#fffefb] px-3 py-1.5 text-xs font-medium transition hover:bg-stone-100 disabled:opacity-40 dark:border-neutral-700 dark:bg-neutral-900 dark:hover:bg-neutral-800"
+                className="inline-flex items-center gap-2 rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-medium transition hover:bg-canvas disabled:opacity-40 dark:border-line dark:bg-surface dark:hover:bg-line"
               >
                 {testBusyId === id ? (
                   <>
@@ -177,8 +177,9 @@ function IntegrationEditModal({
                 )}
               </button>
             ) : null}
+            {row.provider === 'imagekit' ? <p className="w-full text-xs text-muted">Claves del mismo par · ImageKit → Developer options → API keys · Media Read and write. La prueba verifica la clave privada y la lectura; una subida confirma la firma y la escritura.</p> : null}
             {testOkId === id ? (
-              <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400">Firma OK</span>
+              <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400">Clave y lectura verificadas</span>
             ) : null}
           </div>
 
@@ -223,17 +224,17 @@ function IntegrationEditModal({
                 placeholder="Carpeta opcional"
                 className="panel-input text-sm"
               />
-              <div className="rounded-xl border border-dashed border-stone-300 bg-[#f7f4ed]/80 p-3 dark:border-neutral-700 dark:bg-neutral-900/50">
+              <div className="rounded-xl border border-dashed border-line bg-[#f7f4ed]/80 p-3 dark:border-line dark:bg-surface/50">
                 {!persistedToFirestore ? (
-                  <p className="mb-2 text-xs text-amber-900 dark:text-amber-200">
+                  <p className="mb-2 text-xs text-brand dark:text-brand">
                     Pulsa <strong>Guardar cambios</strong> en Configuraciones para persistir esta integración y poder guardar la
                     private key.
                   </p>
                 ) : null}
-                <p className="mb-2 text-[11px] uppercase tracking-wide text-stone-500 dark:text-neutral-500">
+                <p className="mb-2 text-[11px] uppercase tracking-wide text-muted dark:text-muted">
                   Private key (no se muestra)
                 </p>
-                <p className="mb-2 font-mono text-[10px] text-stone-500 break-all opacity-90 dark:text-neutral-500">
+                <p className="mb-2 font-mono text-[10px] text-muted break-all opacity-90 dark:text-muted">
                   Secret: {buildImageKitSecretName(id)}
                 </p>
                 {row.hasPrivateKey && privateKeyEditingId !== id ? (
@@ -280,11 +281,11 @@ function IntegrationEditModal({
                         type="button"
                         disabled={privateKeySavingId === id || !persistedToFirestore}
                         onClick={() => void savePrivateKeyFor(id)}
-                        className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-stone-800 py-2 text-xs font-semibold text-[#fdfcfa] transition hover:bg-stone-700 disabled:opacity-50 dark:bg-neutral-100 dark:text-neutral-950 dark:hover:bg-white sm:w-auto sm:px-4"
+                        className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-surface py-2 text-xs font-semibold text-[#fdfcfa] transition hover:bg-muted disabled:opacity-50 dark:bg-canvas dark:text-muted dark:hover:bg-surface sm:w-auto sm:px-4"
                       >
                         {privateKeySavingId === id ? (
                           <>
-                            <Spinner className="h-3.5 w-3.5 text-[#fdfcfa] dark:text-neutral-950" /> Guardando…
+                            <Spinner className="h-3.5 w-3.5 text-[#fdfcfa] dark:text-muted" /> Guardando…
                           </>
                         ) : row.hasPrivateKey ? (
                           'Guardar reemplazo'
@@ -300,7 +301,7 @@ function IntegrationEditModal({
           )}
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-stone-200 px-5 py-3 dark:border-neutral-800">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line px-5 py-3 dark:border-line">
           <button
             type="button"
             className="text-xs text-red-600 opacity-90 transition hover:opacity-100 dark:text-red-400"
@@ -313,7 +314,7 @@ function IntegrationEditModal({
           >
             Quitar integración
           </button>
-          <p className="max-w-[200px] text-[10px] text-stone-400 dark:text-neutral-600">ID: {id}</p>
+          <p className="max-w-[200px] text-[10px] text-muted dark:text-muted">ID: {id}</p>
         </div>
       </div>
     </div>
@@ -500,7 +501,7 @@ export function ConfiguracionesSection({ reloadSignal = 0 }: Props) {
     setTestOkId(null);
     setError(null);
     try {
-      await requestImageKitUploadAuth(integrationId);
+      await verifyImageKitConnection(integrationId);
       setTestOkId(integrationId);
       window.setTimeout(() => setTestOkId((x) => (x === integrationId ? null : x)), 3200);
     } catch (e) {
@@ -560,7 +561,7 @@ export function ConfiguracionesSection({ reloadSignal = 0 }: Props) {
 
   if (loading) {
     return (
-      <div className="panel-card-muted flex items-center justify-center gap-2 px-4 py-12 text-sm text-stone-600 dark:text-neutral-400">
+      <div className="panel-card-muted flex items-center justify-center gap-2 px-4 py-12 text-sm text-muted dark:text-muted">
         <Spinner className="h-5 w-5" /> Cargando configuración…
       </div>
     );
@@ -570,12 +571,12 @@ export function ConfiguracionesSection({ reloadSignal = 0 }: Props) {
     <section className="space-y-6 opacity-100 transition-opacity duration-300">
       <div className="panel-card space-y-8 p-5 md:p-8">
         <header>
-          <h2 className="text-xl font-semibold tracking-tight text-stone-900 dark:text-neutral-100">
+          <h2 className="text-xl font-semibold tracking-tight text-ink dark:text-ink">
             Configuraciones del panel
           </h2>
-          <p className="mt-2 max-w-2xl text-sm text-stone-600 dark:text-neutral-500">
+          <p className="mt-2 max-w-2xl text-sm text-muted dark:text-muted">
             Tema, integraciones multimedia y políticas de la galería. Cada cuenta ImageKit usa su propio secreto{' '}
-            <code className="rounded-md bg-stone-200/90 px-1.5 py-0.5 text-xs text-stone-800 dark:bg-neutral-800 dark:text-neutral-200">
+            <code className="rounded-md bg-line/90 px-1.5 py-0.5 text-xs text-ink dark:bg-line dark:text-ink">
               IMAGEKIT_PRIVATE_KEY_&lt;id-normalizado&gt;
             </code>{' '}
             en Google Secret Manager (el panel puede crearlo con “Guardar private key”; la función necesita rol Secret
@@ -590,9 +591,9 @@ export function ConfiguracionesSection({ reloadSignal = 0 }: Props) {
               <button
                 type="button"
                 onClick={() => onThemePick('light')}
-                className={`rounded-xl border px-4 py-2 text-sm font-medium transition duration-200 hover:bg-stone-100/80 active:scale-[0.99] dark:hover:bg-neutral-900 ${
+                className={`rounded-xl border px-4 py-2 text-sm font-medium transition duration-200 hover:bg-canvas/80 active:scale-[0.99] dark:hover:bg-surface ${
                   draft.theme === 'light'
-                    ? 'border-stone-300 bg-[#fffefb] text-stone-900 shadow-sm dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100'
+                    ? 'border-line bg-surface text-ink shadow-sm dark:border-line dark:bg-surface dark:text-ink'
                     : 'panel-btn-secondary'
                 }`}
               >
@@ -601,9 +602,9 @@ export function ConfiguracionesSection({ reloadSignal = 0 }: Props) {
               <button
                 type="button"
                 onClick={() => onThemePick('dark')}
-                className={`rounded-xl border px-4 py-2 text-sm font-medium transition duration-200 hover:bg-stone-100/80 active:scale-[0.99] dark:hover:bg-neutral-900 ${
+                className={`rounded-xl border px-4 py-2 text-sm font-medium transition duration-200 hover:bg-canvas/80 active:scale-[0.99] dark:hover:bg-surface ${
                   draft.theme === 'dark'
-                    ? 'border-stone-300 bg-[#fffefb] text-stone-900 shadow-sm dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100'
+                    ? 'border-line bg-surface text-ink shadow-sm dark:border-line dark:bg-surface dark:text-ink'
                     : 'panel-btn-secondary'
                 }`}
               >
@@ -623,7 +624,7 @@ export function ConfiguracionesSection({ reloadSignal = 0 }: Props) {
               <option value="cloudinary">Cloudinary</option>
               <option value="imagekit">ImageKit</option>
             </select>
-            <p className="text-xs text-stone-500 dark:text-neutral-500">
+            <p className="text-xs text-muted dark:text-muted">
               Se usa como default en inputs de subida cuando no eliges proveedor manualmente.
             </p>
           </div>
@@ -631,7 +632,7 @@ export function ConfiguracionesSection({ reloadSignal = 0 }: Props) {
 
         <section className="panel-card-muted space-y-3 rounded-2xl p-4">
           <h3 className="panel-label mb-0">Preferencias del panel</h3>
-          <div className="grid gap-2 text-sm text-stone-700 dark:text-neutral-300 sm:grid-cols-2">
+          <div className="grid gap-2 text-sm text-ink dark:text-ink sm:grid-cols-2">
             <label className="inline-flex items-center gap-2">
               <input
                 type="checkbox"
@@ -675,12 +676,12 @@ export function ConfiguracionesSection({ reloadSignal = 0 }: Props) {
               {newIntegrationMenuOpen ? (
                 <div
                   role="menu"
-                  className="absolute right-0 top-full z-30 mt-1 min-w-[200px] overflow-hidden rounded-xl border border-stone-200 bg-[#fdfcfa] py-1 text-sm shadow-lg dark:border-neutral-700 dark:bg-neutral-950"
+                  className="absolute right-0 top-full z-30 mt-1 min-w-[200px] overflow-hidden rounded-xl border border-line bg-[#fdfcfa] py-1 text-sm shadow-lg dark:border-line dark:bg-canvas"
                 >
                   <button
                     type="button"
                     role="menuitem"
-                    className="w-full px-3 py-2.5 text-left text-stone-800 transition hover:bg-stone-100 dark:text-neutral-200 dark:hover:bg-neutral-800"
+                    className="w-full px-3 py-2.5 text-left text-ink transition hover:bg-canvas dark:text-ink dark:hover:bg-line"
                     onClick={() => {
                       addIntegration('cloudinary');
                       setNewIntegrationMenuOpen(false);
@@ -691,7 +692,7 @@ export function ConfiguracionesSection({ reloadSignal = 0 }: Props) {
                   <button
                     type="button"
                     role="menuitem"
-                    className="w-full px-3 py-2.5 text-left text-stone-800 transition hover:bg-stone-100 dark:text-neutral-200 dark:hover:bg-neutral-800"
+                    className="w-full px-3 py-2.5 text-left text-ink transition hover:bg-canvas dark:text-ink dark:hover:bg-line"
                     onClick={() => {
                       addIntegration('imagekit');
                       setNewIntegrationMenuOpen(false);
@@ -705,7 +706,7 @@ export function ConfiguracionesSection({ reloadSignal = 0 }: Props) {
           </div>
 
           {!integrations.length ? (
-            <p className="text-sm text-neutral-500 dark:text-neutral-500">
+            <p className="text-sm text-muted dark:text-muted">
               Añade al menos una cuenta. Cloudinary: preset sin firma (unsigned). ImageKit: secreto por ID de integración,
               configurado desde aquí o con la CLI.
             </p>
@@ -723,22 +724,22 @@ export function ConfiguracionesSection({ reloadSignal = 0 }: Props) {
               return (
                 <div
                   key={row.id}
-                  className="flex flex-col gap-3 rounded-xl border border-stone-200/90 bg-[#fffefb] p-3 shadow-sm transition hover:border-stone-300 dark:border-neutral-800 dark:bg-neutral-950/50 dark:hover:border-neutral-700"
+                  className="flex flex-col gap-3 rounded-xl border border-line/90 bg-surface p-3 shadow-sm transition hover:border-line dark:border-line dark:bg-canvas/50 dark:hover:border-line"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold text-stone-900 dark:text-neutral-100">
+                      <p className="truncate text-sm font-semibold text-ink dark:text-ink">
                         {row.name || (row.provider === 'cloudinary' ? 'Cloudinary' : 'ImageKit')}
                       </p>
-                      <p className="mt-0.5 truncate text-xs text-stone-500 dark:text-neutral-500" title={summary}>
+                      <p className="mt-0.5 truncate text-xs text-muted dark:text-muted" title={summary}>
                         {summary}
                       </p>
                       <div className="mt-2 flex flex-wrap gap-1.5">
-                        <span className="rounded-md bg-stone-200/70 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-stone-700 dark:bg-neutral-800 dark:text-neutral-300">
+                        <span className="rounded-md bg-line/70 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink dark:bg-line dark:text-ink">
                           {row.provider === 'cloudinary' ? 'CL' : 'IK'}
                         </span>
                         {row.isDefault ? (
-                          <span className="rounded-md border border-stone-300/80 px-1.5 py-0.5 text-[10px] text-stone-600 dark:border-neutral-700 dark:text-neutral-400">
+                          <span className="rounded-md border border-line/80 px-1.5 py-0.5 text-[10px] text-muted dark:border-line dark:text-muted">
                             Predeterminada
                           </span>
                         ) : null}
@@ -746,7 +747,7 @@ export function ConfiguracionesSection({ reloadSignal = 0 }: Props) {
                           className={`rounded-md px-1.5 py-0.5 text-[10px] font-medium ${
                             row.active
                               ? 'bg-emerald-500/15 text-emerald-800 dark:text-emerald-300'
-                              : 'bg-stone-200 text-stone-600 dark:bg-neutral-800 dark:text-neutral-400'
+                              : 'bg-line text-muted dark:bg-line dark:text-muted'
                           }`}
                         >
                           {row.active ? 'Activa' : 'Inactiva'}
@@ -755,8 +756,8 @@ export function ConfiguracionesSection({ reloadSignal = 0 }: Props) {
                           <span
                             className={`rounded-md px-1.5 py-0.5 text-[10px] ${
                               row.hasPrivateKey
-                                ? 'bg-stone-200/80 text-stone-700 dark:bg-neutral-800 dark:text-neutral-300'
-                                : 'bg-amber-100/80 text-amber-950 dark:bg-amber-950/40 dark:text-amber-200'
+                                ? 'bg-line/80 text-ink dark:bg-line dark:text-ink'
+                                : 'bg-brandsoft/80 text-brand dark:bg-brandsoft/40 dark:text-brand'
                             }`}
                           >
                             {row.hasPrivateKey ? 'Key OK' : 'Sin key'}
@@ -773,7 +774,7 @@ export function ConfiguracionesSection({ reloadSignal = 0 }: Props) {
                     Ver detalles y editar
                   </button>
                   {!persistedToFirestore ? (
-                    <p className="text-[10px] leading-snug text-amber-900 dark:text-amber-200/90">
+                    <p className="text-[10px] leading-snug text-brand dark:text-brand/90">
                       Borrador · pulsa Guardar cambios para persistir.
                     </p>
                   ) : null}
@@ -805,16 +806,16 @@ export function ConfiguracionesSection({ reloadSignal = 0 }: Props) {
           />
         ) : null}
 
-        <div className="flex flex-wrap items-center gap-3 border-t border-stone-200/90 pt-6 dark:border-neutral-800">
+        <div className="flex flex-wrap items-center gap-3 border-t border-line/90 pt-6 dark:border-line">
           <button
             type="button"
             disabled={!canSave}
             onClick={() => void onSave()}
-            className="inline-flex min-w-[140px] items-center justify-center gap-2 rounded-xl bg-amber-600 px-5 py-2.5 text-sm font-semibold text-neutral-950 transition hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex min-w-[140px] items-center justify-center gap-2 rounded-xl bg-brand px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-brand disabled:cursor-not-allowed disabled:opacity-50"
           >
             {saving ? (
               <>
-                <Spinner className="h-4 w-4 text-neutral-950" /> Guardando…
+                <Spinner className="h-4 w-4 text-muted" /> Guardando…
               </>
             ) : (
               'Guardar cambios'

@@ -34,7 +34,7 @@ function docIcon() {
 export function CotizacionesGrid({ rows, role, busyId, onDetails, onDelete }: Props) {
   if (!rows.length) {
     return (
-      <div className="rounded-xl border border-dashed border-neutral-800 bg-neutral-900/40 px-6 py-16 text-center text-sm text-neutral-500">
+      <div className="rounded-xl border border-dashed border-line bg-surface/40 px-6 py-16 text-center text-sm text-muted">
         No hay registros que coincidan con los filtros actuales.
       </div>
     );
@@ -51,47 +51,47 @@ export function CotizacionesGrid({ rows, role, busyId, onDetails, onDelete }: Pr
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') onDetails(row);
           }}
-          className="group cursor-pointer rounded-xl border border-neutral-800 bg-neutral-900/40 p-3 text-left transition hover:border-neutral-700 hover:bg-neutral-900/60 focus:outline-none focus:ring-2 focus:ring-amber-500/25"
+          className="group cursor-pointer rounded-xl border border-line bg-surface/40 p-3 text-left transition hover:border-line hover:bg-surface/60 focus:outline-none focus:ring-2 focus:ring-brand/25"
         >
           <div className="flex items-start justify-between gap-2">
-            <div className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-neutral-800 bg-neutral-950 text-neutral-200">
+            <div className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-line bg-canvas text-ink">
               {docIcon()}
             </div>
-            <div className="text-xs font-mono text-neutral-600" title={row.id}>
+            <div className="text-xs font-mono text-muted" title={row.id}>
               {row.id.slice(0, 8)}…
             </div>
           </div>
 
           <div className="mt-2">
-            <div className="truncate text-sm font-semibold text-neutral-100">
+            <div className="truncate text-sm font-semibold text-ink">
               {row.cliente.empresa || '—'}
             </div>
-            <div className="mt-0.5 truncate text-xs text-neutral-300">{row.cliente.nombre || '—'}</div>
-            <div className="mt-0.5 truncate text-[11px] text-neutral-500">{row.cliente.email || '—'}</div>
+            <div className="mt-0.5 truncate text-xs text-ink">{row.cliente.nombre || '—'}</div>
+            <div className="mt-0.5 truncate text-[11px] text-muted">{row.cliente.email || '—'}</div>
           </div>
 
-          <div className="mt-3 grid gap-1.5 rounded-lg border border-neutral-800/60 bg-neutral-950/40 p-2">
+          <div className="mt-3 grid gap-1.5 rounded-lg border border-line/60 bg-canvas/40 p-2">
             <div className="flex items-center justify-between gap-3 text-[11px]">
-              <span className="text-neutral-500">Plan</span>
-              <span className="truncate font-medium text-neutral-200">
+              <span className="text-muted">Plan</span>
+              <span className="truncate font-medium text-ink">
                 {row.plan.nombre || row.plan.valor || '—'}
               </span>
             </div>
             <div className="flex items-center justify-between gap-3 text-[11px]">
-              <span className="text-neutral-500">Total</span>
-              <span className="font-semibold tabular-nums text-neutral-100">
+              <span className="text-muted">Total</span>
+              <span className="font-semibold tabular-nums text-ink">
                 {formatUsd(row.totales.totalEstimadoUsd)}
               </span>
             </div>
             <div className="flex items-center justify-between gap-3 text-[11px]">
-              <span className="text-neutral-500">Fecha</span>
-              <span className="text-neutral-400">{formatDate(row.creadoEn)}</span>
+              <span className="text-muted">Fecha</span>
+              <span className="text-muted">{formatDate(row.creadoEn)}</span>
             </div>
           </div>
 
           <div className="mt-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="inline-flex items-center justify-center rounded-md border border-neutral-700 bg-neutral-900 px-2.5 py-1 text-[11px] font-medium text-neutral-200 transition group-hover:border-neutral-600 group-hover:bg-neutral-800">
+              <span className="inline-flex items-center justify-center rounded-md border border-line bg-surface px-2.5 py-1 text-[11px] font-medium text-ink transition group-hover:border-line group-hover:bg-line">
                 Ver detalles
               </span>
               {role === 'admin' ? (
